@@ -18,7 +18,7 @@ export default function CheckRow({
           onValueChange={onToggle}
           trackColor={{ false: '#e6e0d0', true: `${accent}66` }}
           thumbColor={checked ? accent : '#f4f3f4'}
-          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+          ios_backgroundColor="#e6e0d0"
         />
         <Text style={styles.label}>{label}</Text>
       </View>
@@ -43,11 +43,14 @@ const styles = StyleSheet.create({
   row: {
     gap: 10,
     marginBottom: 12,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minHeight: 44,
   },
   tail: {
     flexDirection: 'row',
@@ -65,13 +68,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#d8d1bf',
     borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    fontSize: 13,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
     color: '#232a2e',
     backgroundColor: '#fff',
-    width: 88,
+    width: 100,
+    minHeight: 40,
     textAlign: 'right',
   },
   unit: {

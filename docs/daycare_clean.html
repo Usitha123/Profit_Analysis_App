@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daycare Centre — Mathematical Decision Models</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --color-background-primary:#ffffff;
+  --color-background-secondary:#f6f2e8;
+  --color-background-page:#f1ece0;
+  --color-background-success:#eaf6ee;
+  --color-background-warning:#fdf3e2;
+  --color-text-primary:#232a2e;
+  --color-text-secondary:#6b7178;
+  --color-text-success:#2f7a4f;
+  --color-text-warning:#a06a12;
+  --color-text-danger:#a83e3e;
+  --color-border-primary:#d8d1bf;
+  --color-border-secondary:#e6e0d0;
+  --color-border-tertiary:#eee9dc;
+  --color-border-success:#bfe2ca;
+  --color-border-warning:#f0dcae;
+  --border-radius-md:10px;
+  --font-display:"Fredoka",-apple-system,sans-serif;
+  --font-body:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono","SFMono-Regular",Consolas,monospace;
+
+  /* per-model accent colours (also set inline per tab/panel as --tab-accent) */
+  --accent-lp:#3d6ea5;   /* denim — staffing */
+  --accent-co:#2f8f83;   /* teal — cost optimisation */
+  --accent-be:#3f7d5c;   /* chalk green — break-even */
+  --accent-gr:#c98a1f;   /* marigold — growth */
+  --accent-pf:#8a4a86;   /* plum — profit */
+  --accent-red:#c0574f;
+}
+*{box-sizing:border-box;}
+html{background:var(--color-background-page);}
+body{
+  margin:0; padding:32px 20px 60px;
+  background:
+    radial-gradient(var(--color-border-secondary) 1px, transparent 1px) 0 0/22px 22px,
+    var(--color-background-page);
+  color:var(--color-text-primary);
+  font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:900px;margin:0 auto;}
+.masthead{display:flex;align-items:flex-start;gap:14px;margin-bottom:1rem;}
+.masthead .badge{flex:0 0 auto;width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent-be),var(--accent-lp));display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(50,60,50,.18);}
+.masthead .badge svg{width:24px;height:24px;color:#fff;}
+h1{font-family:var(--font-display);font-size:23px;font-weight:600;margin:0 0 4px;letter-spacing:.2px;color:var(--color-text-primary);}
+.subtitle{font-size:13.5px;color:var(--color-text-secondary);margin:0;line-height:1.55;max-width:640px;}
+
+.hero-banner{width:100%;height:auto;display:block;border-radius:16px;margin:1.1rem 0 0;border:1.5px solid var(--color-border-secondary);}
+
+/* ---- Your own photos: see the photo-strip block in the HTML below ---- */
+.photo-strip{display:flex;gap:10px;margin:1rem 0 .2rem;flex-wrap:wrap;}
+.photo-strip img{flex:1 1 160px;height:150px;object-fit:cover;border-radius:12px;border:1.5px solid var(--color-border-secondary);background:var(--color-background-secondary);}
+.photo-strip figcaption{display:none;}
+
+.tab-banner-wrap{position:relative;width:100%;height:2px;border-radius:14px;overflow:hidden;margin:8px 0 16px;background:color-mix(in srgb, var(--tab-accent) 6%, var(--color-background-primary));border:1.5px solid color-mix(in srgb, var(--tab-accent) 20%, transparent);}
+.tab-banner{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;}
+.tab-banner-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;}
+
+.check-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--tab-accent);flex:0 0 auto;cursor:pointer;}
+.check-row label{font-size:13px;color:var(--color-text-primary);min-width:170px;cursor:pointer;}
+.check-row input[type=number]{margin-left:auto;}
+.check-row .unit{font-size:11.5px;color:var(--color-text-secondary);}
+
+table.mkt{width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;}
+table.mkt th{text-align:left;padding:7px 9px;background:var(--color-background-secondary);font-weight:600;color:var(--color-text-secondary);font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;}
+table.mkt td{padding:7px 9px;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-primary);}
+table.mkt td.num, table.mkt th.num{font-family:var(--font-mono);text-align:right;}
+table.mkt tr:last-child td{border-bottom:none;}
+
+.roadmap{display:flex;gap:10px;overflow-x:auto;margin:10px 0 4px;padding-bottom:6px;}
+.roadmap-card{flex:0 0 168px;background:var(--color-background-secondary);border-radius:10px;padding:12px 13px;border-top:4px solid var(--stage-color, var(--tab-accent));}
+.roadmap-card .rm-phase{font-family:var(--font-display);font-size:12.5px;font-weight:600;margin-bottom:2px;}
+.roadmap-card .rm-time{font-family:var(--font-mono);font-size:10.5px;color:var(--color-text-secondary);margin-bottom:7px;}
+.roadmap-card .rm-actions{font-size:11px;color:var(--color-text-secondary);line-height:1.5;margin-bottom:8px;min-height:48px;}
+.roadmap-card .rm-cost{font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:var(--stage-color, var(--tab-accent));}
+
+.gauge-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.gauge-row .gauge-label{font-size:12px;color:var(--color-text-secondary);min-width:150px;}
+.gauge-track{flex:1;height:20px;background:var(--color-background-secondary);border-radius:6px;overflow:hidden;border:1px solid var(--color-border-secondary);}
+.gauge-fill{height:100%;border-radius:6px 0 0 6px;transition:width .2s ease;}
+.gauge-row .gauge-val{font-family:var(--font-mono);font-size:12px;font-weight:700;min-width:110px;text-align:right;}
+
+.slider-row .range-dual{position:relative;flex:1;height:26px;}
+.range-dual .dual-bg{position:absolute;left:0;top:11px;width:100%;height:4px;background:var(--color-border-secondary);border-radius:2px;}
+.range-dual .dual-fill{position:absolute;top:11px;height:4px;background:var(--tab-accent);border-radius:2px;}
+.range-dual input[type=range]{position:absolute;left:0;top:6px;width:100%;height:14px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;pointer-events:none;}
+.range-dual input[type=range]::-webkit-slider-runnable-track{background:transparent;height:14px;}
+.range-dual input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:var(--tab-accent);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:pointer;margin-top:0;}
+.range-dual input[type=range]::-moz-range-track{background:transparent;border:none;height:14px;}
+.range-dual input[type=range]::-moz-range-thumb{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:var(--tab-accent);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:pointer;}
+.slider-row span.dual-v{min-width:168px;}
+.dual-nums{display:flex;align-items:center;gap:4px;min-width:168px;}
+.dual-num{width:76px;font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--tab-accent);background:color-mix(in srgb, var(--tab-accent) 12%, transparent);border:1.5px solid transparent;border-radius:6px;padding:3px 5px;text-align:right;}
+.dual-num:focus{outline:none;border-color:var(--tab-accent);background:var(--color-background-primary);}
+.dual-sep{color:var(--color-text-secondary);font-size:12px;}
+.slider-row input[type=number].co-num{width:90px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--tab-accent);background:color-mix(in srgb, var(--tab-accent) 12%, transparent);border:1.5px solid transparent;border-radius:6px;padding:4px 8px;text-align:right;}
+.slider-row input[type=number].co-num:focus{outline:none;border-color:var(--tab-accent);background:var(--color-background-primary);}
+
+.refgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px;}
+@media (max-width:600px){.refgrid{grid-template-columns:1fr;}}
+.refcard{display:flex;gap:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:11px 12px;border-left:3px solid var(--tab-accent);}
+.refcard .refico{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:color-mix(in srgb, var(--tab-accent) 14%, transparent);display:flex;align-items:center;justify-content:center;}
+.refcard .refico svg{width:16px;height:16px;color:var(--tab-accent);}
+.refcard .reftext{font-size:11.5px;color:var(--color-text-secondary);line-height:1.5;}
+.refcard .reftext b{color:var(--color-text-primary);font-family:var(--font-mono);}
+.refcard.capex{border-left-style:dashed;}
+
+.material-strip{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 4px;}
+.material-strip figure{margin:0;flex:1 1 110px;max-width:130px;}
+.material-strip img{width:100%;height:90px;object-fit:cover;border-radius:10px;border:1.5px solid var(--color-border-secondary);background:var(--color-background-secondary);display:block;}
+.material-strip figcaption{font-size:11px;color:var(--color-text-secondary);margin-top:5px;line-height:1.4;}
+.material-strip figcaption span{display:block;font-family:var(--font-mono);font-weight:700;color:var(--tab-accent);margin-top:1px;}
+
+
+.tabs{display:flex;gap:3px;margin:1.75rem 0 0;flex-wrap:wrap;border-bottom:2px solid var(--color-border-primary);padding-left:2px;}
+.tab{
+  --tab-tint: rgba(0,0,0,.04);
+  position:relative; top:2px;
+  display:flex;align-items:center;gap:8px;
+  padding:10px 16px 9px;
+  font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.1px;
+  border:2px solid transparent;border-bottom:none;
+  border-radius:11px 11px 0 0;
+  cursor:pointer;background:transparent;color:var(--color-text-secondary);
+  transition:background .15s ease,color .15s ease,top .15s ease;
+}
+.tab svg{width:16px;height:16px;color:var(--color-text-secondary);transition:color .15s ease;flex:0 0 auto;}
+.tab:hover{color:var(--color-text-primary);background:rgba(0,0,0,.03);}
+.tab.active{
+  top:0; background:var(--color-background-primary); color:var(--color-text-primary);
+  border-color:var(--color-border-primary); border-bottom-color:var(--color-background-primary);
+  border-top:3px solid var(--tab-accent);
+  box-shadow:0 -3px 10px rgba(0,0,0,.04);
+}
+.tab.active svg{color:var(--tab-accent);}
+.tab-num{font-family:var(--font-mono);font-size:10.5px;opacity:.55;}
+
+.sheet{
+  background:var(--color-background-primary);
+  border:2px solid var(--color-border-primary); border-top:none;
+  border-radius:0 0 14px 14px;
+  padding:26px 26px 24px;
+  box-shadow:0 8px 24px rgba(40,35,20,.06);
+}
+
+.panel{display:none;} .panel.active{display:block;}
+.panel .intro{font-size:13.5px;color:var(--color-text-secondary);margin:0 0 1rem;line-height:1.6;max-width:680px;}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1rem;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem;}
+#be-metrics{grid-template-columns:repeat(4,1fr);}
+@media (max-width:600px){.grid3{grid-template-columns:1fr 1fr;} .slider-row label{min-width:150px !important;}}
+
+.metric{background:var(--color-background-secondary);border-top:3px solid var(--tab-accent);border-radius:var(--border-radius-md);padding:13px 14px;}
+.metric-label{font-size:11.5px;color:var(--color-text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
+.metric-value{font-family:var(--font-mono);font-size:19px;font-weight:700;color:var(--color-text-primary);}
+.metric-sub{font-size:11.5px;color:var(--color-text-secondary);margin-top:3px;}
+
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:11px;}
+.slider-row label{font-size:13px;color:var(--color-text-secondary);min-width:230px;}
+.slider-row span{font-family:var(--font-mono);font-size:12.5px;font-weight:700;min-width:82px;text-align:right;color:var(--tab-accent);background:color-mix(in srgb, var(--tab-accent) 12%, transparent);padding:3px 8px;border-radius:6px;}
+
+input[type=range]{flex:1;accent-color:var(--tab-accent);height:4px;cursor:pointer;}
+input[type=number]{border:1.5px solid var(--color-border-primary);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--font-mono);width:80px;color:var(--color-text-primary);background:var(--color-background-primary);}
+input[type=number]:focus, input[type=range]:focus{outline:2px solid var(--tab-accent);outline-offset:1px;}
+
+.eq-box{background:var(--color-background-secondary);border-left:3px solid var(--tab-accent);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;padding:11px 15px;margin:14px 0;font-size:12.5px;font-family:var(--font-mono);color:var(--color-text-primary);line-height:1.7;}
+
+.result-box{border-radius:var(--border-radius-md);padding:13px 16px;margin-top:12px;font-size:13px;line-height:1.55;}
+.result-ok{background:var(--color-background-success);color:var(--color-text-success);border:1.5px solid var(--color-border-success);}
+.result-warn{background:var(--color-background-warning);color:var(--color-text-warning);border:1.5px solid var(--color-border-warning);}
+
+.section-title{font-family:var(--font-display);font-size:13.5px;font-weight:600;color:var(--color-text-primary);margin:1.3rem 0 0.6rem;display:flex;align-items:center;gap:8px;}
+.section-title::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--tab-accent);flex:0 0 auto;}
+.note{font-size:12px;color:var(--color-text-secondary);margin-top:10px;line-height:1.55;padding-left:2px;border-left:2px solid var(--color-border-secondary);padding-left:10px;}
+
+.constraint-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 2px;border-bottom:1px dashed var(--color-border-tertiary);}
+.constraint-row:last-child{border-bottom:none;}
+.cval{font-family:var(--font-mono);font-weight:700;}
+
+table.lp{width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;}
+table.lp th{text-align:left;padding:8px 9px;background:var(--color-background-secondary);font-weight:600;color:var(--color-text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.3px;}
+table.lp th:first-child{border-radius:6px 0 0 6px;} table.lp th:last-child{border-radius:0 6px 6px 0;}
+table.lp td{padding:7px 9px;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle;}
+table.lp td:not(:first-child){font-family:var(--font-mono);}
+table.lp tr:last-child td{border-bottom:none;font-weight:700;background:var(--color-background-secondary);}
+table.lp tr:last-child td:first-child{border-radius:6px 0 0 6px;} table.lp tr:last-child td:last-child{border-radius:0 6px 6px 0;}
+
+.varbox{background:color-mix(in srgb, var(--tab-accent) 6%, var(--color-background-primary));border:1.5px solid color-mix(in srgb, var(--tab-accent) 22%, transparent);border-left:4px solid var(--tab-accent);border-radius:var(--border-radius-md);padding:13px 15px;margin:12px 0 18px;}
+.varbox-title{font-family:var(--font-display);font-size:12.5px;font-weight:600;margin-bottom:7px;color:var(--color-text-primary);display:flex;align-items:center;gap:6px;}
+.varbox ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--color-text-secondary);line-height:1.7;}
+.varbox b{color:var(--color-text-primary);}
+
+.bar-stack{display:flex;width:100%;height:24px;border-radius:7px;overflow:hidden;margin:10px 0 8px;border:1.5px solid var(--color-border-secondary);}
+.bar-seg{height:100%;transition:width .2s ease;}
+.bar-legend{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:11.5px;color:var(--color-text-secondary);margin-bottom:16px;font-family:var(--font-mono);}
+.bar-legend span.sw{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px;}
+
+.legend-row{display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--color-text-secondary);flex-wrap:wrap;}
+.legend-row span{display:flex;align-items:center;gap:5px;}
+.legend-line{width:12px;height:3px;display:inline-block;border-radius:2px;}
+
+button.action{margin-top:14px;background:var(--color-background-primary);border:1.5px solid var(--tab-accent);border-radius:999px;padding:8px 16px;font-size:12.5px;font-weight:600;color:var(--tab-accent);cursor:pointer;transition:background .15s ease,color .15s ease;font-family:var(--font-body);}
+button.action:hover{background:var(--tab-accent);color:#fff;}
+
+.chart-holder{position:relative;width:100%;height:280px;margin-top:1.1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px;}
+.asset-life{width:56px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="masthead">
+  <div class="badge">[SVG]</div>
+  <div>
+    <h1 id="pageTitle">Daycare Centre — Mathematical Decision Models</h1>
+   
+  </div>
+</div>
+
+<!-- ============================================================================
+     YOUR OWN PHOTOS — the 3 images below are generated placeholder
+     illustrations (flat-style, no real people), sized 800×600, saved in
+     the images/ folder next to this HTML file. Swap them for real photos
+     whenever you have them:
+     1. Put your image files in the images/ folder (or use a hosted URL).
+     2. Replace each src="..." below with your filename or URL.
+     3. Keep roughly landscape, ~800×600px, for best results.
+     4. If a src is missing/broken, onerror hides that image automatically
+        so the layout never shows a broken-image icon — the illustration
+        underneath (for tab banners) takes over instead.
+     5. Delete the whole photo-strip block below if you'd rather have
+        no header images at all.
+
+     Every place in this file where you can drop in a photo is marked with
+     an "EDIT HERE" comment right above the <img> tag — just search for
+     "EDIT HERE" and replace the src on the line below each one.
+     ============================================================================ -->
+<div class="photo-strip">
+  <!-- EDIT HERE: header photo 1 — currently a generated illustration; replace src with a real exterior photo -->
+  <img src="[BASE64_IMG]" alt="Centre exterior" onerror="this.style.display='none'">
+  <!-- EDIT HERE: header photo 2 — currently a generated illustration; replace src with a real classroom photo -->
+  <img src="[BASE64_IMG]" alt="Classroom / play area" onerror="this.style.display='none'">
+  <!-- EDIT HERE: header photo 3 — currently a generated illustration; replace src with a real playground photo -->
+  <img src="[BASE64_IMG]" alt="Outdoor playground" onerror="this.style.display='none'">
+</div>
+
+<div class="tabs">
+  <div class="tab active" style="--tab-accent:var(--accent-lp);" onclick="switchTab('lp')">
+    [SVG]
+    <span class="tab-num">01</span> Staff optimisation
+  </div>
+  <div class="tab" style="--tab-accent:var(--accent-co);" onclick="switchTab('co')">
+    [SVG]
+    <span class="tab-num">02</span> Cost optimisation
+  </div>
+  <div class="tab" style="--tab-accent:var(--accent-be);" onclick="switchTab('be')">
+    [SVG]
+    <span class="tab-num">03</span> Break-even &amp; costs
+  </div>
+  <div class="tab" style="--tab-accent:var(--accent-gr);" onclick="switchTab('gr')">
+    [SVG]
+    <span class="tab-num">04</span> Growth model
+  </div>
+  <div class="tab" style="--tab-accent:var(--accent-pf);" onclick="switchTab('pf')">
+    [SVG]
+    <span class="tab-num">05</span> Profit &amp; depreciation
+  </div>
+</div>
+
+<div class="sheet">
+
+<!-- ============================================================ TAB 1: LINEAR PROGRAMMING ============================================================ -->
+<div class="panel active" id="tab-lp" style="--tab-accent:var(--accent-lp);">
+  <p class="intro">Minimise total monthly staff cost subject to regulatory child-to-staff ratios and a total staffing budget. Drag the enrolment sliders and edit the salary boxes to see how the optimal solution changes.</p>
+
+  <div class="tab-banner-wrap">
+    [SVG]
+    <!-- EDIT HERE: Tab 1 banner — currently a generated illustration; replace src with a real staff/classroom photo -->
+    <img class="tab-banner-photo" src="[BASE64_IMG]" alt="Daycare staff and classroom" onerror="this.style.display='none'">
+  </div>
+
+  <div class="varbox">
+    <div class="varbox-title">Variables to determine from Section B &amp; C of Our Data Collection Form</div>
+    <ul>
+      <li><b>Q4–Q6</b> — age-group split and enrolment numbers → sets the enrolment sliders below.</li>
+      <li><b>Q7</b> — number of staff surveyed per role → sanity-check against the ratio-derived minimums here.</li>
+      <li><b>Q8</b> — monthly salary range per role.
+      <li>Regulatory ratios (NCPA guideline, not on the form) — confirm current ratios with NCPA before finalising.</li>
+    </ul>
+  </div>
+
+  <div class="eq-box">Minimise: Z = S_mgr·m + S_teach·t + S_baby·b + S_help·h + S_sec·s<br>Subject to: ratio constraints (below) and Z ≤ Budget</div>
+
+  <div class="section-title">Enrolment inputs (Q4–Q6)</div>
+  <div class="slider-row"><label>Infants (6–18 mo)</label><input type="range" min="2" max="15" value="5" id="inf" oninput="calcLP()"><span id="inf-v">5</span></div>
+  <div class="slider-row"><label>Toddlers (18mo–3yr)</label><input type="range" min="2" max="20" value="7" id="tod" oninput="calcLP()"><span id="tod-v">7</span></div>
+  <div class="slider-row"><label>Pre-schoolers (3–5)</label><input type="range" min="2" max="25" value="9" id="pre" oninput="calcLP()"><span id="pre-v">9</span></div>
+  <div class="slider-row"><label>School-age (5–10)</label><input type="range" min="0" max="20" value="7" id="sch" oninput="calcLP()"><span id="sch-v">7</span></div>
+
+  <div class="section-title">Monthly staffing budget cap</div>
+  <div class="slider-row"><label>Budget ceiling (Rs.)</label><input type="range" min="200000" max="700000" step="5000" value="350000" id="lpBudget" oninput="calcLP()"><span id="lpBudget-v">Rs. 350,000</span></div>
+
+  <div class="section-title">Constraints satisfied</div>
+  <div id="lp-constraints"></div>
+
+  <div class="section-title">Optimal staff allocation — salary boxes are editable (Q8)</div>
+  <table class="lp">
+    <thead><tr><th>Role</th><th>Min required</th><th>Salary (Rs./mo) — edit</th><th>Cost (Rs.)</th></tr></thead>
+    <tbody id="lp-table"></tbody>
+  </table>
+
+  <div class="grid3" style="margin-top:14px;" id="lp-metrics"></div>
+
+  <div class="note">The LP finds the minimum staff needed to legally operate under standard child-to-staff ratios (1:3 infants, 1:5 toddlers, 1:8 pre-school, 1:12 school-age). This is your cost floor — you cannot legally go below it, regardless of budget.</div>
+  <button class="action" onclick="sendPrompt('Can you write the Python scipy.optimize linprog code for this daycare staff optimisation problem?')">Get Python linprog code ↗</button>
+</div>
+
+<!-- ============================================================ TAB 2: COST OPTIMISATION ============================================================ -->
+<div class="panel" id="tab-co" style="--tab-accent:var(--accent-co);">
+  <p class="intro">A second, separate model: instead of allocating staff to roles, this allocates the <i>entire</i> monthly operating budget across every cost category to find the minimum-cost way to legally and competitively run the centre at a target enrolment. 
+  <div class="tab-banner-wrap">
+    [SVG]
+    <!-- EDIT HERE: Tab 2 banner — currently a generated illustration; replace src with a real budget/supplies photo -->
+    <img class="tab-banner-photo" src="[BASE64_IMG]" alt="Daycare budget and supplies" onerror="this.style.display='none'">
+  </div>
+
+  <div class="varbox">
+    <div class="varbox-title">How this model is built</div>
+    <ul>
+      <li>Every category floor below is its own slider 
+      <li>Staff cost floor is the one exception: it's computed live from Tab 1's ratio-optimal staffing plan, recomputed for whatever enrolment n you set below — model composition, not a guess.</li>
+      <li>Because every constraint here is a <i>lower bound</i> and every cost coefficient is positive, the mathematically optimal (minimum-cost) solution is always to fund each category at exactly its floor — the model's job is to add them up correctly and check the total fits your budget.</li>
+      <li><b>Fixed costs</b> (rent, utilities, insurance, marketing, activities) don't change with enrolment — they're a flat monthly range. <b>Variable costs</b> (food, supplies, materials, maintenance) are priced per child and scale with n.</li>
+    </ul>
+  </div>
+
+  <div class="section-title">Reference examples — what does this typically cost?</div>
+  <div class="refgrid">
+    <div class="refcard"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Rent</b> — fixed. Your 12 surveyed centres average <b>Rs. 68,000/mo</b> (median Rs. 70,000), ranging Rs. 17,500–180,000 depending on location and size.</div></div>
+    <div class="refcard"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Utilities</b> — fixed. Your surveyed centres average <b>Rs. 17,500/mo</b> (median Rs. 12,500) — most are small operations without full AC.</div></div>
+    <div class="refcard"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Insurance &amp; other</b> — fixed. Your surveyed centres average <b>Rs. 11,500/mo</b> (median Rs. 7,500) for maintenance, insurance and misc.</div></div>
+    <div class="refcard"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Marketing</b> — fixed. Your surveyed centres average <b>Rs. 7,300/mo</b> (median Rs. 3,500) — 92% use social media and 83% word of mouth; none reported newspaper ads.</div></div>
+    <div class="refcard"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Activities</b> — fixed. Of your 12 surveyed centres: 100% run a play group and field trips, 92% hold concerts, 58% run workshops, but only 25% offer swimming.</div></div>
+
+    <div class="refcard"><div class="refico">[SVG]</div>
+     
+      <div class="reftext"><b>Educational supplies</b> — per child. Books, worksheets and art supplies replenished termly: about <b>Rs. 200–300/child/mo</b>.</div></div>
+    <div class="refcard"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Activity materials</b> — per child. Toys, puzzles and sports-equipment wear allocation: about <b>Rs. 140–190/child/mo</b>.</div></div>
+    <div class="refcard"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Maintenance &amp; contingency</b> — per child. Cleaning, minor repairs and a safety buffer: about <b>Rs. 180–240/child/mo</b>.</div></div>
+    <div class="refcard capex"><div class="refico">[SVG]</div>
+      <div class="reftext"><b>Furniture (capital, not monthly)</b> — a cot/chair/shelf set per child costs roughly <b>Rs. 4,500–7,000 one-time</b>. Not part of this LP; it's depreciated over 7 years in Tab 5's Capital Assets table.</div></div>
+  </div>
+
+  <div class="section-title">Furniture &amp; material examples (capital reference, per item)</div>
+  <div class="material-strip">
+    <!-- EDIT HERE: material photo 1 — cot / crib -->
+    <figure><img src="[BASE64_IMG]" alt="Infant cot" onerror="this.parentElement.style.display='none'"><figcaption>Cot / crib<span>Rs. 12,000–18,000</span></figcaption></figure>
+    <!-- EDIT HERE: material photo 2 — chair set -->
+    <figure><img src="[BASE64_IMG]" alt="Toddler chair" onerror="this.parentElement.style.display='none'"><figcaption>Chair (set of 4)<span>Rs. 8,000–14,000</span></figcaption></figure>
+    <!-- EDIT HERE: material photo 3 — activity table -->
+    <figure><img src="[BASE64_IMG]" alt="Activity table" onerror="this.parentElement.style.display='none'"><figcaption>Activity table<span>Rs. 10,000–16,000</span></figcaption></figure>
+    <!-- EDIT HERE: material photo 4 — storage shelving -->
+    <figure><img src="[BASE64_IMG]" alt="Storage shelf" onerror="this.parentElement.style.display='none'"><figcaption>Storage shelving<span>Rs. 6,000–11,000</span></figcaption></figure>
+    <!-- EDIT HERE: material photo 5 — play mats -->
+    <figure><img src="[BASE64_IMG]" alt="Play mats" onerror="this.parentElement.style.display='none'"><figcaption>Play mats (set)<span>Rs. 4,000–7,500</span></figcaption></figure>
+     <figure><img src="images/material-beds.jpg" alt="Beds" onerror="this.parentElement.style.display='none'"><figcaption>Beds<span>Rs. 4,000–7,500</span></figcaption></figure>
+  </div>
+  <div class="note">Prices are typical retail/wholesale ranges for durable childcare furniture in Sri Lanka — planning reference only, not live quotes. </div>
+
+  <div class="eq-box">Minimise  C = Rent+Util+Ins+Mkt+Staff+Food+Edu+Act+Maint+Activities<br>Subject to: each term ≥ its floor (contractual / regulatory / quality minimum)<br>and C ≤ Budget cap</div>
+
+  <div class="section-title">Target enrolment &amp; budget ceiling</div>
+  <div class="slider-row"><label>Target enrolment n</label><input type="range" min="10" max="100" value="28" id="coN" oninput="syncCoNFromSlider()"><input type="number" class="co-num" min="10" max="100" value="28" id="coN-num" oninput="syncCoNFromNumber()"></div>
+  <div class="slider-row"><label>Monthly budget cap (Rs.)</label><input type="range" min="200000" max="1500000" step="10000" value="450000" id="coBudget" oninput="syncCoBudgetFromSlider()"><input type="number" class="co-num" min="200000" max="1500000" step="10000" value="450000" id="coBudget-num" oninput="syncCoBudgetFromNumber()"></div>
+
+  <button class="action" onclick="autoSuggestRanges()" style="background:var(--tab-accent);color:#fff;">↻ Auto-suggest all ranges for this n &amp; budget</button>
+  <div class="note" style="margin-top:10px;">Every range below scales automatically with the two sliders above whenever you click this — fixed costs (rent, utilities, insurance, marketing, activities) scale with <strong>n</strong>, and the per-child items also stretch or shrink to fit your <strong>budget cap</strong>. If a suggested range isn't right for your situation, just drag the slider or type your own number in the box next to it — auto-suggest never overwrites anything unless you click the button again.</div>
+  <div id="co-autoNote"></div>
+
+  <div class="section-title">Fixed-category ranges (Rs. / month) — Q11, Q12, Q15, Q18</div>
+  <div class="slider-row"><label>Rent range (Q11)</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-rent-fill"></div>
+      <input type="range" min="10000" max="300000" step="2500" value="55000" id="dr-rent-lo" oninput="updateDual('rent')">
+      <input type="range" min="10000" max="300000" step="2500" value="85000" id="dr-rent-hi" oninput="updateDual('rent')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-rent-lo-n" value="55000" oninput="syncDualFromNumber('rent')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-rent-hi-n" value="85000" oninput="syncDualFromNumber('rent')"></span></div>
+  <div class="slider-row"><label>Utilities range (Q12)</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-util-fill"></div>
+      <input type="range" min="5000" max="80000" step="2500" value="12500" id="dr-util-lo" oninput="updateDual('util')">
+      <input type="range" min="5000" max="80000" step="2500" value="20000" id="dr-util-hi" oninput="updateDual('util')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-util-lo-n" value="12500" oninput="syncDualFromNumber('util')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-util-hi-n" value="20000" oninput="syncDualFromNumber('util')"></span></div>
+  <div class="slider-row"><label>Insurance &amp; other range (Q15)</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-ins-fill"></div>
+      <input type="range" min="2500" max="80000" step="2500" value="7500" id="dr-ins-lo" oninput="updateDual('ins')">
+      <input type="range" min="2500" max="80000" step="2500" value="15000" id="dr-ins-hi" oninput="updateDual('ins')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-ins-lo-n" value="7500" oninput="syncDualFromNumber('ins')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-ins-hi-n" value="15000" oninput="syncDualFromNumber('ins')"></span></div>
+  <div class="slider-row"><label>Marketing range (Q18)</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-mkt-fill"></div>
+      <input type="range" min="2500" max="60000" step="500" value="3500" id="dr-mkt-lo" oninput="updateDual('mkt')">
+      <input type="range" min="2500" max="60000" step="500" value="10000" id="dr-mkt-hi" oninput="updateDual('mkt')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-mkt-lo-n" value="3500" oninput="syncDualFromNumber('mkt')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-mkt-hi-n" value="10000" oninput="syncDualFromNumber('mkt')"></span></div>
+  <div class="slider-row"><label>Activities range (Q16, amortised)</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-activities-fill"></div>
+      <input type="range" min="0" max="40000" step="1000" value="12000" id="dr-activities-lo" oninput="updateDual('activities')">
+      <input type="range" min="0" max="40000" step="1000" value="20000" id="dr-activities-hi" oninput="updateDual('activities')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-activities-lo-n" value="12000" oninput="syncDualFromNumber('activities')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-activities-hi-n" value="20000" oninput="syncDualFromNumber('activities')"></span></div>
+
+  <div class="section-title">Per-child ranges (Rs. / child / month) — Q13</div>
+  <div class="slider-row"><label>Food &amp; supplies range</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-food-fill"></div>
+      <input type="range" min="100" max="2500" step="25" value="400" id="dr-food-lo" oninput="updateDual('food')">
+      <input type="range" min="100" max="2500" step="25" value="600" id="dr-food-hi" oninput="updateDual('food')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-food-lo-n" value="400" oninput="syncDualFromNumber('food')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-food-hi-n" value="600" oninput="syncDualFromNumber('food')"></span></div>
+  <div class="slider-row"><label>Educational supplies range</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-edu-fill"></div>
+      <input type="range" min="50" max="800" step="25" value="200" id="dr-edu-lo" oninput="updateDual('edu')">
+      <input type="range" min="50" max="800" step="25" value="300" id="dr-edu-hi" oninput="updateDual('edu')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-edu-lo-n" value="200" oninput="syncDualFromNumber('edu')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-edu-hi-n" value="300" oninput="syncDualFromNumber('edu')"></span></div>
+  <div class="slider-row"><label>Activity materials range</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-act-fill"></div>
+      <input type="range" min="50" max="600" step="25" value="140" id="dr-act-lo" oninput="updateDual('act')">
+      <input type="range" min="50" max="600" step="25" value="190" id="dr-act-hi" oninput="updateDual('act')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-act-lo-n" value="140" oninput="syncDualFromNumber('act')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-act-hi-n" value="190" oninput="syncDualFromNumber('act')"></span></div>
+  <div class="slider-row"><label>Maintenance &amp; contingency range</label>
+    <div class="range-dual"><div class="dual-bg"></div><div class="dual-fill" id="dr-maint-fill"></div>
+      <input type="range" min="50" max="700" step="25" value="180" id="dr-maint-lo" oninput="updateDual('maint')">
+      <input type="range" min="50" max="700" step="25" value="240" id="dr-maint-hi" oninput="updateDual('maint')">
+    </div><span class="dual-nums"><input type="number" class="dual-num" id="dr-maint-lo-n" value="180" oninput="syncDualFromNumber('maint')"><span class="dual-sep">–</span><input type="number" class="dual-num" id="dr-maint-hi-n" value="240" oninput="syncDualFromNumber('maint')"></span></div>
+
+  <div class="section-title">Solved: minimum-cost and maximum-plausible allocation</div>
+  <div class="grid3" id="co-summary" style="margin-top:4px;"></div>
+  <table class="lp" id="co-table">
+    <thead><tr><th>Category</th><th>Range used (Rs./mo)</th><th>Source</th></tr></thead>
+    <tbody id="co-table-body"></tbody>
+  </table>
+
+  <div class="section-title">Minimum required · budget cap · maximum plausible</div>
+  <div id="co-gauge"></div>
+
+  <div id="co-result"></div>
+
+  <button class="action" onclick="sendPrompt('Can you write the Python scipy.optimize linprog code for this daycare cost optimisation problem, using a [min,max] range per category and a budget cap constraint?')">Get Python linprog code ↗</button>
+</div>
+
+<!-- ============================================================ TAB 3: BREAK-EVEN ============================================================ -->
+<div class="panel" id="tab-be" style="--tab-accent:var(--accent-be);">
+  <p class="intro">Break-even is a linear equation in one variable: the enrolment n where total revenue equals total cost. Cost is split into fixed items (don't change with enrolment) and variable items (scale per child) — build both from your surveyed ranges.</p>
+
+  <div class="tab-banner-wrap">
+    [SVG]
+    <!-- EDIT HERE: Tab 3 banner — currently a generated illustration; replace src with a real finances/enrolment photo -->
+    <img class="tab-banner-photo" src="[BASE64_IMG]" alt="Daycare finances and enrolment" onerror="this.style.display='none'">
+  </div>
+
+  <div class="varbox">
+    <div class="varbox-title">Variables to determine from Sections D &amp; E of your Data Collection Form</div>
+    <ul>
+      <li><b>Q9</b> — monthly fee per child (bins: &lt;5k / 5–10k / 10–15k / &gt;15k) → sets the fee slider.</li>
+      <li><b>Q10</b> — whether additional fees (registration, meals, transport) are charged → toggle below adds them to revenue.</li>
+      <li><b>Q11</b> Rent, <b>Q12</b> Utilities, <b>Q14</b> Staff salary, <b>Q15</b> Other (maintenance, insurance, misc.) → sum of researched mid-points sets Fixed Cost.</li>
+      <li><b>Q16</b> Annual activities (play group, swimming, concerts, workshops, field trips) → amortised into Fixed Cost below.</li>
+      <li><b>Q18</b> Marketing budget, split by the channel mix from <b>Q17</b> → added to Fixed Cost.</li>
+      <li><b>Q13</b> Food &amp; supplies plus activity/maintenance spend, divided by the enrolment you surveyed it at → sets the Variable-Cost-per-child breakdown.</li>
+    </ul>
+  </div>
+
+  <div class="eq-box">Revenue(n) = (fee + addFee) × n<br>Cost(n) = FixedCost + VariableCost/child × n<br>Break-even: Revenue(n) = Cost(n)  →  n* = FC / (fee + addFee − VC)</div>
+
+  <div class="section-title">Fee per child (Q9–Q10)</div>
+  <div class="slider-row"><label>Avg monthly fee (Rs.)</label><input type="range" min="5000" max="30000" step="500" value="11000" id="fee" oninput="calcBE()"><span id="fee-v">Rs. 11,000</span></div>
+  <div class="check-row">
+    <input type="checkbox" id="addFeeOn" checked oninput="calcBE()">
+    <label for="addFeeOn">Charge additional fees (Q10)</label>
+    <input type="range" min="0" max="20000" step="500" value="2000" id="addFee" oninput="calcBE()" style="max-width:160px;">
+    <span id="addFee-v">Rs. 1,500</span>
+  </div>
+
+  <div class="section-title">Fixed cost breakdown (Rs. / month) — Q11, Q12, Q14, Q15, Q18</div>
+  <div class="slider-row"><label>Rent (Q11)</label><input type="range" min="10000" max="300000" step="2500" value="68000" id="rent" oninput="calcBE()"><span id="rent-v">Rs. 68,000</span></div>
+  <div class="slider-row"><label>Utilities (Q12)</label><input type="range" min="10000" max="80000" step="2500" value="17500" id="util" oninput="calcBE()"><span id="util-v">Rs. 17,500</span></div>
+  <div class="slider-row"><label>Total staff salaries (Q14)</label><input type="range" min="50000" max="600000" step="5000" value="202000" id="salFix" oninput="calcBE()"><span id="salFix-v">Rs. 202,000</span></div>
+  <div class="slider-row"><label>Insurance &amp; other (Q15)</label><input type="range" min="5000" max="80000" step="2500" value="11500" id="otherFix" oninput="calcBE()"><span id="otherFix-v">Rs. 11,500</span></div>
+  <div class="slider-row"><label>Marketing (Q18)</label><input type="range" min="2500" max="60000" step="500" value="7300" id="mktFix" oninput="calcBE()"><span id="mktFix-v">Rs. 7,300</span></div>
+
+  <div style="font-size:11.5px;color:var(--color-text-secondary);margin:2px 0 4px;">Marketing mix (Q17) — allocated proportionally from your total, using the channel split from your marketing plan</div>
+  <table class="mkt" id="mkt-table"></table>
+
+  <div class="section-title">Annual activities (Q16) — amortised into fixed cost</div>
+  <div id="activities-list"></div>
+
+  <div id="fc-bar"></div>
+
+  <div class="section-title">Variable cost breakdown, per child / month (Q13 and related)</div>
+  <div class="slider-row"><label>Food &amp; supplies</label><input type="range" min="100" max="2500" step="25" value="500" id="vFood" oninput="calcBE()"><span id="vFood-v">Rs. 500</span></div>
+  <div class="slider-row"><label>Educational supplies &amp; stationery</label><input type="range" min="50" max="800" step="25" value="250" id="vEdu" oninput="calcBE()"><span id="vEdu-v">Rs. 250</span></div>
+  <div class="slider-row"><label>Activity materials</label><input type="range" min="50" max="600" step="25" value="165" id="vAct" oninput="calcBE()"><span id="vAct-v">Rs. 165</span></div>
+  <div class="slider-row"><label>Maintenance &amp; contingency</label><input type="range" min="50" max="700" step="25" value="210" id="vMaint" oninput="calcBE()"><span id="vMaint-v">Rs. 210</span></div>
+
+  <div id="vc-bar"></div>
+
+  <div class="grid3" id="be-metrics" style="margin-top:4px;"></div>
+
+  <div id="be-result"></div>
+
+  <div class="chart-holder">
+    <canvas id="beChart" role="img" aria-label="Break-even line chart showing revenue and cost curves crossing at the break-even point">Break-even analysis chart for daycare centre.</canvas>
+  </div>
+  <div class="legend-row">
+    <span><span class="legend-line" style="background:var(--accent-be);"></span>Revenue</span>
+    <span><span class="legend-line" style="background:var(--accent-red);"></span>Total cost</span>
+    <span><span class="legend-line" style="border-top:2px dashed var(--accent-gr);height:0;"></span>Fixed cost</span>
+  </div>
+</div>
+
+<!-- ============================================================ TAB 3: GROWTH ============================================================ -->
+<div class="panel" id="tab-gr" style="--tab-accent:var(--accent-gr);">
+  <p class="intro">The logistic growth model applies when growth is constrained by capacity. It gives an S-shaped curve — fast early growth that plateaus near capacity K. The break-even line is pulled live from Tab 2, so it updates if you change the fee or cost breakdown.</p>
+
+  <div class="tab-banner-wrap">
+    [SVG]
+    <!-- EDIT HERE: Tab 4 banner — currently a generated illustration; replace src with a real enrolment/growth photo -->
+    <img class="tab-banner-photo" src="[BASE64_IMG]" alt="Daycare enrolment growth" onerror="this.style.display='none'">
+  </div>
+
+  <div class="varbox">
+    <div class="varbox-title">Variables to determine</div>
+    <ul>
+      <li><b>Q3, Q6</b> — years operating and current enrolment → informs a realistic starting point N₀.</li>
+      <li><b>Q5</b> — maximum capacity → sets K.</li>
+      <li><b>Growth rate r</b> is not collected by the form directly; estimate it from how quickly comparable centres filled up (ask in follow-up interviews or use the slider to test scenarios). Kept fully adjustable, as before.</li>
+    </ul>
+  </div>
+
+  <div class="eq-box">N(t) = K / (1 + ((K − N₀) / N₀) × e^(−r·t))<br>K = capacity, N₀ = initial enrolment, r = growth rate, t = month</div>
+
+  <div class="slider-row"><label>Initial enrolment N₀ (Q6)</label><input type="range" min="5" max="50" value="15" id="n0" oninput="calcGrowth()"><span id="n0-v">15</span></div>
+  <div class="slider-row"><label>Capacity K (Q5)</label><input type="range" min="15" max="120" value="30" id="cap" oninput="calcGrowth()"><span id="cap-v">30</span></div>
+  <div class="slider-row"><label>Growth rate r (your estimate)</label><input type="range" min="0.05" max="0.4" step="0.01" value="0.15" id="gr" oninput="calcGrowth()"><span id="gr-v">0.15</span></div>
+
+  <div class="grid3" id="gr-metrics" style="margin-top:8px;margin-bottom:12px;"></div>
+
+  <div class="chart-holder" style="height:280px;">
+    <canvas id="grChart" role="img" aria-label="S-curve logistic growth chart showing enrolment growing from initial value to capacity over 36 months">Logistic enrolment growth projection chart.</canvas>
+  </div>
+  <div class="legend-row">
+    <span><span class="legend-line" style="background:var(--accent-gr);"></span>Enrolment N(t)</span>
+    <span><span class="legend-line" style="border-top:2px dashed #999;height:0;"></span>Capacity K</span>
+    <span><span class="legend-line" style="background:var(--accent-be);"></span>Break-even (live from Tab 2)</span>
+  </div>
+  <button class="action" onclick="sendPrompt('Can you write Python scipy curve_fit code to fit a logistic growth model to real enrolment data for a daycare centre?')">Get Python curve_fit code ↗</button>
+
+  
+</div>
+
+<!-- ============================================================ TAB 4: PROFIT & DEPRECIATION ============================================================ -->
+<div class="panel" id="tab-pf" style="--tab-accent:var(--accent-pf);">
+  <p class="intro">Net profit = Revenue − Operating cost − Depreciation. Operating cost and fee are pulled live from Tab 2. Depreciation spreads each capital asset's cost over its useful life (straight-line) — edit the cost and life of any asset below to match your own quotations.</p>
+
+  <div class="tab-banner-wrap">
+    [SVG]
+    <!-- EDIT HERE: Tab 5 banner — currently a generated illustration; replace src with a real profit/finance photo -->
+    <img class="tab-banner-photo" src="[BASE64_IMG]" alt="Daycare profit and depreciation" onerror="this.style.display='none'">
+  </div>
+
+  <div class="varbox">
+    <div class="varbox-title">Variables to determine</div>
+    <ul>
+      <li>Fee, Fixed Cost and Variable-Cost/child are inherited from Tab 2 — set them there.</li>
+      <li><b>Capital expenditure items</b> — replace the cost of each asset with your actual supplier quotations.</li>
+      <li><b>Useful life (years)</b> — replace with the depreciation policy you intend to use (equipment, furniture, IT etc. typically 3–10 years); this determines annual/monthly depreciation.</li>
+      <li>One-off items (legal &amp; licensing, launch marketing, working-capital reserve) are capital outlay but are <i>not</i> depreciated — they are shown separately.</li>
+    </ul>
+  </div>
+
+  <div class="eq-box">EBITDA(n) = Revenue(n) − OperatingCost(n) = fee·n − (FC + VC·n)<br>Depreciation/mo = Σ (AssetCost_i / UsefulLife_i) / 12<br>Net profit(n) = EBITDA(n) − Depreciation/mo</div>
+
+  <div class="section-title">Enrolment to evaluate</div>
+  <div class="slider-row"><label>Children enrolled</label><input type="range" min="10" max="100" value="30" id="pfN" oninput="calcProfit()"><span id="pfN-v">30</span></div>
+
+  <div class="grid3" id="pf-metrics" style="margin-top:4px;"></div>
+
+  <div class="section-title">Capital assets &amp; depreciation (straight-line)</div>
+  <table class="lp" id="pf-asset-table">
+    <thead><tr><th>Asset</th><th>Cost (Rs.)</th><th>Useful life (yrs)</th><th>Annual dep.</th><th>Monthly dep.</th></tr></thead>
+    <tbody id="pf-asset-body"></tbody>
+  </table>
+
+  <div class="section-title" style="margin-top:14px;">One-off, non-depreciable capital outlay</div>
+  <table class="lp">
+    <thead><tr><th>Item</th><th>Cost (Rs.)</th></tr></thead>
+    <tbody id="pf-nondep-body"></tbody>
+  </table>
+
+  <div id="pf-result"></div>
+
+  <div class="chart-holder">
+    <canvas id="pfChart" role="img" aria-label="Net profit versus enrolment chart, showing where the centre becomes profitable once depreciation is included">Net profit versus enrolment chart.</canvas>
+  </div>
+  <div class="legend-row">
+    <span><span class="legend-line" style="background:var(--accent-pf);"></span>Net profit (after depreciation)</span>
+    <span><span class="legend-line" style="border-top:2px dashed var(--accent-be);height:0;"></span>Cash break-even (Tab 2)</span>
+    <span><span class="legend-line" style="border-top:2px dashed var(--accent-gr);height:0;"></span>Accounting break-even (incl. depreciation)</span>
+  </div>
+  <button class="action" onclick="sendPrompt('Can you write a Python script that models daycare profit including straight-line depreciation and outputs payback period and ROI?')">Get Python profit-model code ↗</button>
+</div>
+
+</div><!-- /.sheet -->
+</div><!-- /.wrap -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let beChart, grChart, pfChart;
+
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', ['lp','co','be','gr','pf'][i]===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if(id==='co') calcCost();
+  if(id==='be' && !beChart) initBE();
+  if(id==='gr' && !grChart) initGrowth();
+  if(id==='pf' && !pfChart) initProfit();
+}
+
+function fmt(n){ return Math.round(n).toLocaleString(); }
+function metricCard(label,value,sub){
+  return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div>${sub?`<div class="metric-sub">${sub}</div>`:''}</div>`;
+}
+function renderBar(containerId, items){
+  const total = items.reduce((s,i)=>s+i.value,0) || 1;
+  const seg = items.map(i=>`<div class="bar-seg" style="width:${(i.value/total*100).toFixed(2)}%;background:${i.color};" title="${i.label}: Rs. ${fmt(i.value)}"></div>`).join('');
+  const legend = items.map(i=>`<span><span class="sw" style="background:${i.color};"></span>${i.label}: Rs. ${fmt(i.value)}</span>`).join('');
+  document.getElementById(containerId).innerHTML = `<div class="bar-stack">${seg}</div><div class="bar-legend">${legend}</div>`;
+}
+function existingOr(id, fallback){ const el=document.getElementById(id); return el ? +el.value : fallback; }
+
+// ── Q16: annual activities, amortised into fixed cost ──
+const ACTIVITIES=[
+  {key:'play',  name:'Play group sessions', annual:20000,  checked:true},
+  {key:'swim',  name:'Swimming',            annual:150000, checked:false},
+  {key:'concert',name:'Concerts',           annual:60000,  checked:true},
+  {key:'workshop',name:'Workshops',         annual:40000,  checked:true},
+  {key:'field', name:'Field trips',         annual:80000,  checked:true}
+];
+function renderActivities(){
+  document.getElementById('activities-list').innerHTML = ACTIVITIES.map(a=>`
+    <div class="check-row">
+      <input type="checkbox" id="act-${a.key}-on" ${a.checked?'checked':''} oninput="calcBE()">
+      <label for="act-${a.key}-on">${a.name}</label>
+      <input type="number" step="5000" id="act-${a.key}-cost" value="${a.annual}" oninput="calcBE()">
+      <span class="unit">Rs./yr</span>
+    </div>`).join('');
+}
+function getActivitiesMonthly(){
+  let total=0;
+  ACTIVITIES.forEach(a=>{
+    const on=document.getElementById(`act-${a.key}-on`)?.checked;
+    const cost=existingOr(`act-${a.key}-cost`, a.annual);
+    if(on) total+=cost;
+  });
+  return total/12;
+}
+
+// ── Q17: marketing channel mix, scaled proportionally from the total marketing slider ──
+const MKT_CHANNELS=[
+  {name:'Facebook & Instagram ads', base:9000, reach:'used by 92% of surveyed centres'},
+  {name:'WhatsApp / word of mouth', base:6000, reach:'used by 83% of surveyed centres'},
+  {name:'Printed flyers & banners', base:4000, reach:'used by 42% of surveyed centres'},
+  {name:'Open days & events',       base:2500, reach:'20–40 families/event'},
+  {name:'Website & blog',           base:2000, reach:'300 visits/mo'},
+  {name:'Google Business & SEO',    base:1000, reach:'500 local searches/mo'},
+  {name:'Corporate HR tie-ups',     base:500,  reach:'Targeted B2B reach'}
+];
+const MKT_BASE_TOTAL = MKT_CHANNELS.reduce((s,c)=>s+c.base,0); // 25,000 — weighted to match your survey's channel usage
+function renderMarketingMix(mktFix){
+  const rows = MKT_CHANNELS.map(c=>{
+    const alloc = c.base/MKT_BASE_TOTAL*mktFix;
+    return `<tr><td>${c.name}</td><td class="num">Rs. ${fmt(alloc)}</td><td>${c.reach}</td></tr>`;
+  }).join('');
+  document.getElementById('mkt-table').innerHTML =
+    `<thead><tr><th>Channel</th><th class="num">Budget</th><th>Expected reach</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+// ── Phase roadmap (reference — from your capex phasing plan) ──
+const ROADMAP=[
+  {phase:'Phase 0 — Planning', time:'Months −6 to −3', actions:'Registration, licensing, lease signed, bank account opened', cost:50000, color:'#3d6ea5'},
+  {phase:'Phase 1 — Build-out', time:'Months −3 to 0', actions:'Renovation, furniture, security, playground, staff hired', cost:3200000, color:'#3f7d5c'},
+  {phase:'Phase 2 — Launch', time:'Months 1–3', actions:'Grand opening, open days, first 30 enrolments', cost:350000, color:'#c98a1f'},
+  {phase:'Phase 3 — Growth', time:'Months 4–12', actions:'Scale to 60+ children, full activity calendar', cost:200000, color:'#8a4a86'},
+  {phase:'Phase 4 — Expansion', time:'Year 2+', actions:'Reach 90-child capacity, explore 2nd location', cost:200000, color:'#c0574f'}
+];
+function renderRoadmap(){
+  const el=document.getElementById('pf-roadmap');
+  if(!el) return;
+  el.innerHTML = ROADMAP.map(p=>`
+    <div class="roadmap-card" style="--stage-color:${p.color};">
+      <div class="rm-phase">${p.phase}</div>
+      <div class="rm-time">${p.time}</div>
+      <div class="rm-actions">${p.actions}</div>
+      <div class="rm-cost">Rs. ${fmt(p.cost)}</div>
+    </div>`).join('');
+}
+
+// ── SHARED: read current break-even inputs from Tab 2 (used by Tabs 3 & 4 too) ──
+function getBEInputs(){
+  const baseFee = +document.getElementById('fee').value;
+  const addFeeOn = document.getElementById('addFeeOn').checked;
+  const addFee = addFeeOn ? +document.getElementById('addFee').value : 0;
+
+  const rent  = +document.getElementById('rent').value;
+  const util  = +document.getElementById('util').value;
+  const salFix= +document.getElementById('salFix').value;
+  const otherFix = +document.getElementById('otherFix').value;
+  const mktFix   = +document.getElementById('mktFix').value;
+  const activitiesMonthly = getActivitiesMonthly();
+  const fc = rent + util + salFix + otherFix + mktFix + activitiesMonthly;
+
+  const vFood = +document.getElementById('vFood').value;
+  const vEdu  = +document.getElementById('vEdu').value;
+  const vAct  = +document.getElementById('vAct').value;
+  const vMaint= +document.getElementById('vMaint').value;
+  const vc = vFood + vEdu + vAct + vMaint;
+
+  const fee = baseFee + addFee; // effective revenue per child, used by all downstream models
+  const bep = fc / (fee - vc);
+  return { fee, baseFee, addFee, fc, vc, bep, breakdown:{rent,util,salFix,otherFix,mktFix,activitiesMonthly,vFood,vEdu,vAct,vMaint} };
+}
+
+// ══════════════════════════════════════════ TAB 1: LP ══════════════════════════════════════════
+function calcLP(){
+  const inf=+document.getElementById('inf').value, tod=+document.getElementById('tod').value,
+        pre=+document.getElementById('pre').value, sch=+document.getElementById('sch').value,
+        budget=+document.getElementById('lpBudget').value;
+  document.getElementById('inf-v').textContent=inf;
+  document.getElementById('tod-v').textContent=tod;
+  document.getElementById('pre-v').textContent=pre;
+  document.getElementById('sch-v').textContent=sch;
+  document.getElementById('lpBudget-v').textContent='Rs. '+fmt(budget);
+
+  const babyCare=Math.ceil(inf/3), helpers=Math.ceil(tod/5),
+        teachers=Math.ceil(pre/8)+Math.ceil(sch/12), managers=1, security=1;
+
+  const salMgr = existingOr('sal-mgr', 46000);
+  const salTeach = existingOr('sal-teach', 34000);
+  const salBaby = existingOr('sal-baby', 26000);
+  const salHelp = existingOr('sal-help', 30000);
+  const salSec = existingOr('sal-sec', 28000);
+
+  const roles=[
+    {name:'Manager / Admin', n:managers, sal:salMgr, id:'sal-mgr'},
+    {name:'Lead teacher / coordinator', n:teachers, sal:salTeach, id:'sal-teach'},
+    {name:'Baby caretaker', n:babyCare, sal:salBaby, id:'sal-baby'},
+    {name:'Nursery helper', n:helpers, sal:salHelp, id:'sal-help'},
+    {name:'Security (not on form — research separately)', n:security, sal:salSec, id:'sal-sec'}
+  ];
+
+  const total = roles.reduce((s,r)=>s+r.n*r.sal,0);
+  const totalStaff = roles.reduce((s,r)=>s+r.n,0);
+  const totalChildren = inf+tod+pre+sch;
+
+  document.getElementById('lp-table').innerHTML = roles.map(r=>
+    `<tr><td>${r.name}</td><td>${r.n}</td><td><input type="number" step="500" id="${r.id}" value="${r.sal}" oninput="calcLP()"></td><td>Rs. ${fmt(r.n*r.sal)}</td></tr>`
+  ).join('') + `<tr><td>Total</td><td>${totalStaff}</td><td></td><td>Rs. ${fmt(total)}</td></tr>`;
+
+  document.getElementById('lp-constraints').innerHTML=[
+    {label:`Infants ratio (1:3) — need ≥${Math.ceil(inf/3)} carer(s)`, ok:babyCare>=Math.ceil(inf/3)},
+    {label:`Toddlers ratio (1:5) — need ≥${Math.ceil(tod/5)} helper(s)`, ok:helpers>=Math.ceil(tod/5)},
+    {label:`Pre-school ratio (1:8) — need ≥${Math.ceil(pre/8)} teacher(s)`, ok:teachers>=Math.ceil(pre/8)},
+    {label:`School-age ratio (1:12) — need ≥${Math.ceil(sch/12)} coord(s)`, ok:true},
+    {label:`Budget: total cost Rs. ${fmt(total)} of Rs. ${fmt(budget)} cap`, ok:total<=budget}
+  ].map(c=>`<div class="constraint-row"><span>${c.label}</span><span class="cval" style="color:var(--color-text-${c.ok?'success':'danger'})">${c.ok?'✓ Met':'✗ Exceeded'}</span></div>`).join('');
+
+  document.getElementById('lp-metrics').innerHTML =
+    metricCard('Min staff cost', `Rs. ${fmt(total)}`, 'per month') +
+    metricCard('Total staff', totalStaff, `for ${totalChildren} children`) +
+    metricCard('Cost per child', `Rs. ${fmt(total/totalChildren)}`, 'monthly avg');
+}
+calcLP();
+renderActivities();
+renderRoadmap();
+
+// ══════════════════════════════════════════ TAB 2: COST OPTIMISATION ══════════════════════════════════════════
+const CO_AGE_MIX = {inf:0.178, tod:0.267, pre:0.333, sch:0.222}; // same split used in Tab 1's defaults
+function staffMinForN(n){
+  const inf=Math.round(n*CO_AGE_MIX.inf), tod=Math.round(n*CO_AGE_MIX.tod), pre=Math.round(n*CO_AGE_MIX.pre);
+  const sch=n-inf-tod-pre;
+  const caretakers=Math.ceil(inf/3), helpers=Math.ceil(tod/5), teachers=Math.ceil(pre/8)+Math.ceil(sch/12);
+  const salMgr=existingOr('sal-mgr',46000), salTeach=existingOr('sal-teach',34000),
+        salBaby=existingOr('sal-baby',26000), salHelp=existingOr('sal-help',30000), salSec=existingOr('sal-sec',28000);
+  const cost = salMgr*1 + salTeach*teachers + salBaby*caretakers + salHelp*helpers + salSec*1;
+  return {cost, split:{inf,tod,pre,sch}, staff:{caretakers,helpers,teachers,managers:1,security:1}};
+}
+
+const CO_KEYS = ['rent','util','ins','mkt','activities','food','edu','act','maint'];
+function updateDual(key, fromNumber){
+  const loEl=document.getElementById('dr-'+key+'-lo'), hiEl=document.getElementById('dr-'+key+'-hi');
+  const loNumEl=document.getElementById('dr-'+key+'-lo-n'), hiNumEl=document.getElementById('dr-'+key+'-hi-n');
+  const min=+loEl.min, max=+loEl.max;
+  let lo=+loEl.value, hi=+hiEl.value;
+  if(lo>hi){
+    if(document.activeElement===loEl || document.activeElement===hiNumEl){ /* keep as-is, clamp below */ }
+    if(document.activeElement===loEl){ hi=lo; hiEl.value=hi; } else { lo=hi; loEl.value=lo; }
+  }
+  lo=Math.min(Math.max(lo,min),max); hi=Math.min(Math.max(hi,min),max);
+  loEl.value=lo; hiEl.value=hi;
+  if(loNumEl) loNumEl.value=lo;
+  if(hiNumEl) hiNumEl.value=hi;
+  const fill=document.getElementById('dr-'+key+'-fill');
+  const pctLo=(lo-min)/(max-min)*100, pctHi=(hi-min)/(max-min)*100;
+  fill.style.left=pctLo+'%'; fill.style.width=Math.max(0,pctHi-pctLo)+'%';
+  calcCost();
+}
+function syncDualFromNumber(key){
+  const loEl=document.getElementById('dr-'+key+'-lo'), hiEl=document.getElementById('dr-'+key+'-hi');
+  const loNumEl=document.getElementById('dr-'+key+'-lo-n'), hiNumEl=document.getElementById('dr-'+key+'-hi-n');
+  let lo=+loNumEl.value, hi=+hiNumEl.value;
+  if(lo>hi){ [lo,hi]=[hi,lo]; }
+  loEl.value=lo; hiEl.value=hi;
+  updateDual(key, true);
+}
+function getDual(key){
+  return { lo:+document.getElementById('dr-'+key+'-lo').value, hi:+document.getElementById('dr-'+key+'-hi').value };
+}
+
+function syncCoNFromSlider(){ document.getElementById('coN-num').value = document.getElementById('coN').value; calcCost(); }
+function syncCoNFromNumber(){
+  const el=document.getElementById('coN-num');
+  let v=Math.min(Math.max(+el.value,10),100);
+  el.value=v; document.getElementById('coN').value=v; calcCost();
+}
+function syncCoBudgetFromSlider(){ document.getElementById('coBudget-num').value = document.getElementById('coBudget').value; calcCost(); }
+function syncCoBudgetFromNumber(){
+  const el=document.getElementById('coBudget-num');
+  let v=Math.min(Math.max(+el.value,400000),1500000);
+  el.value=v; document.getElementById('coBudget').value=v; calcCost();
+}
+
+// ── Auto-suggest: scale every range to the chosen n and budget cap.
+// Only runs when the button is clicked — never fights a manual edit. ──
+function autoSuggestRanges(){
+  const n = +document.getElementById('coN').value;
+  const budget = +document.getElementById('coBudget').value;
+  const clampStep = (val,min,max,step) => Math.min(Math.max(Math.round(val/step)*step, min), max);
+
+  // Fixed categories scale with enrolment n (bigger centre needs more space,
+  // power, cover and reach) — coefficients calibrated against your survey averages at n=28
+  // the original researched defaults.
+  const fixed = {
+    rent:       [clampStep(1000*n+30000, 50000,300000,5000), clampStep(1300*n+30000, 50000,300000,5000)],
+    util:       [clampStep(300*n+1000,   10000,80000, 2500), clampStep(450*n+1500,   10000,80000, 2500)],
+    ins:        [clampStep(150*n+1500,   5000, 80000, 2500), clampStep(250*n+2500,   5000, 80000, 2500)],
+    mkt:        [clampStep(200*n+2000,   5000, 60000, 2500), clampStep(300*n+3000,   5000, 60000, 2500)],
+    activities: [clampStep(150*n+1500,   0,    40000, 1000), clampStep(250*n+2500,   0,    40000, 1000)],
+  };
+  Object.keys(fixed).forEach(key=>{
+    document.getElementById('dr-'+key+'-lo').value = fixed[key][0];
+    document.getElementById('dr-'+key+'-hi').value = fixed[key][1];
+    updateDual(key);
+  });
+
+  // Per-child categories then stretch or shrink to fit whatever budget
+  // is left over after staff + the fixed categories above.
+  const staffCost = staffMinForN(n).cost;
+  const fixedTotalLo = fixed.rent[0]+fixed.util[0]+fixed.ins[0]+fixed.mkt[0]+fixed.activities[0]+staffCost;
+  const baseline = {food:[250,350], edu:[200,300], act:[140,190], maint:[180,240]};
+  const baselineLoSum = baseline.food[0]+baseline.edu[0]+baseline.act[0]+baseline.maint[0];
+  const availableForPerChild = budget - fixedTotalLo;
+  const neededAtBaseline = baselineLoSum * n;
+  let factor = neededAtBaseline > 0 ? availableForPerChild/neededAtBaseline : 1;
+  factor = Math.min(Math.max(factor, 0.6), 1.6); // keep suggestions realistic even at budget extremes
+
+  const stepMap = {food:25, edu:25, act:25, maint:25};
+  Object.keys(baseline).forEach(key=>{
+    const loEl=document.getElementById('dr-'+key+'-lo'), hiEl=document.getElementById('dr-'+key+'-hi');
+    const min=+loEl.min, max=+loEl.max, step=stepMap[key];
+    loEl.value = clampStep(baseline[key][0]*factor, min, max, step);
+    hiEl.value = clampStep(baseline[key][1]*factor, min, max, step);
+    updateDual(key);
+  });
+
+  calcCost();
+  document.getElementById('co-autoNote').innerHTML =
+    `<div class="result-box result-ok">Suggested ranges set for <strong>${n} children</strong> and a <strong>Rs. ${fmt(budget)}</strong> budget` +
+    (factor>=1.55 ? ' — your budget has plenty of headroom, so per-child ranges were pushed to a higher-quality tier.' :
+     factor<=0.65 ? ' — your budget is tight at this enrolment, so per-child ranges were pulled down toward the minimum viable spend.' :
+     '.') +
+    ` These are starting points, not fixed truths — edit any slider or number box above if your own research says otherwise.</div>`;
+}
+
+function calcCost(){
+  const n = +document.getElementById('coN').value;
+  const budget = +document.getElementById('coBudget').value;
+
+  const rent=getDual('rent'), util=getDual('util'), ins=getDual('ins'), mkt=getDual('mkt'), activities=getDual('activities');
+  const food=getDual('food'), edu=getDual('edu'), act=getDual('act'), maint=getDual('maint');
+  const staffRes = staffMinForN(n);
+  const perChildLo = food.lo+edu.lo+act.lo+maint.lo, perChildHi = food.hi+edu.hi+act.hi+maint.hi;
+
+  const rows = [
+    {label:'Rent', lo:rent.lo, hi:rent.hi, src:'own range'},
+    {label:'Utilities', lo:util.lo, hi:util.hi, src:'own range'},
+    {label:'Insurance & other', lo:ins.lo, hi:ins.hi, src:'own range'},
+    {label:'Marketing', lo:mkt.lo, hi:mkt.hi, src:'own range'},
+    {label:'Staff', lo:staffRes.cost, hi:staffRes.cost, src:`Tab 1, recomputed at n=${n} (not a range — solved optimum)`},
+    {label:'Food & supplies', lo:food.lo*n, hi:food.hi*n, src:`Rs. ${fmt(food.lo)}–${fmt(food.hi)}/child × ${n} children`},
+    {label:'Educational supplies', lo:edu.lo*n, hi:edu.hi*n, src:`Rs. ${fmt(edu.lo)}–${fmt(edu.hi)}/child × ${n} children`},
+    {label:'Activity materials', lo:act.lo*n, hi:act.hi*n, src:`Rs. ${fmt(act.lo)}–${fmt(act.hi)}/child × ${n} children`},
+    {label:'Maintenance & contingency', lo:maint.lo*n, hi:maint.hi*n, src:`Rs. ${fmt(maint.lo)}–${fmt(maint.hi)}/child × ${n} children`},
+    {label:'Activities (amortised)', lo:activities.lo, hi:activities.hi, src:'own range'},
+  ];
+  const totalMin = rows.reduce((s,r)=>s+r.lo,0);
+  const totalMax = rows.reduce((s,r)=>s+r.hi,0);
+
+  document.getElementById('co-table-body').innerHTML = rows.map(r=>
+    `<tr><td>${r.label}</td><td>Rs. ${fmt(r.lo)}${r.lo!==r.hi?' – '+fmt(r.hi):''}</td><td style="font-family:var(--font-body);color:var(--color-text-secondary);font-size:11px;">${r.src}</td></tr>`
+  ).join('') + `<tr><td>Minimum feasible cost C*</td><td>Rs. ${fmt(totalMin)}</td><td></td></tr>`
+    + `<tr><td>Maximum plausible cost</td><td>Rs. ${fmt(totalMax)}</td><td></td></tr>`;
+
+  // Prominent summary — makes it obvious the totals move with n
+  document.getElementById('co-summary').innerHTML =
+    metricCard('Children (n)', n, 'target enrolment set above') +
+    metricCard('Per-child subtotal', `Rs. ${fmt(perChildLo)}–${fmt(perChildHi)}`, 'food+edu+materials+maint, per child') +
+    metricCard('Minimum feasible cost', `Rs. ${fmt(totalMin)}`, `at n = ${n}`);
+
+  const feasible = totalMin <= budget;
+  const maxScale = Math.max(totalMax, budget) * 1.05;
+  const bar = (val,color) => `<div class="gauge-track"><div class="gauge-fill" style="width:${(val/maxScale*100).toFixed(1)}%;background:${color};"></div></div>`;
+  document.getElementById('co-gauge').innerHTML = `
+    <div class="gauge-row"><span class="gauge-label">Minimum required</span>${bar(totalMin, feasible?'#3f7d5c':'#c0574f')}<span class="gauge-val">Rs. ${fmt(totalMin)}</span></div>
+    <div class="gauge-row"><span class="gauge-label">Your budget cap</span>${bar(budget,'#c98a1f')}<span class="gauge-val">Rs. ${fmt(budget)}</span></div>
+    <div class="gauge-row"><span class="gauge-label">Maximum plausible</span>${bar(totalMax,'#8a4a86')}<span class="gauge-val">Rs. ${fmt(totalMax)}</span></div>`;
+
+  document.getElementById('co-result').innerHTML = feasible
+    ? `<div class="result-box result-ok">Feasible — the minimum-cost allocation of <strong>Rs. ${fmt(totalMin)}/month</strong> fits within your Rs. ${fmt(budget)} cap, with Rs. ${fmt(budget-totalMin)} of slack. The LP always binds every category at the <em>low</em> end of its range (minimising a sum of positive-coefficient terms with only lower bounds); the high end (Rs. ${fmt(totalMax)}) shows your realistic worst case if every category ran to the top of its researched range.</div>`
+    : `<div class="result-box result-warn">Infeasible — at ${n} children, even funding every category at the <em>low</em> end of its range costs <strong>Rs. ${fmt(totalMin)}/month</strong>, which exceeds your Rs. ${fmt(budget)} cap by Rs. ${fmt(totalMin-budget)}. Raise the budget cap, reduce enrolment, narrow a range above, or revisit staff salaries on Tab 1.</div>`;
+}
+CO_KEYS.forEach(k=>updateDual(k));
+
+
+// ══════════════════════════════════════════ TAB 2: BREAK-EVEN ══════════════════════════════════════════
+function initBE(){
+  const ctx=document.getElementById('beChart').getContext('2d');
+  beChart = new Chart(ctx,{
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'Revenue',data:[],borderColor:'#3f7d5c',borderWidth:2.5,pointRadius:0,fill:false},
+      {label:'Total cost',data:[],borderColor:'#c0574f',borderWidth:2.5,pointRadius:0,fill:false},
+      {label:'Fixed cost',data:[],borderColor:'#c98a1f',borderWidth:1.5,borderDash:[5,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{
+        x:{title:{display:true,text:'Number of children enrolled',font:{size:11}}},
+        y:{title:{display:true,text:'Rs. per month',font:{size:11}},ticks:{callback:v=>'Rs. '+(v/1000).toFixed(0)+'k'}}
+      }
+    }
+  });
+  calcBE();
+}
+
+function calcBE(){
+  const {fee,baseFee,addFee,fc,vc,bep,breakdown}=getBEInputs();
+  document.getElementById('fee-v').textContent='Rs. '+fmt(baseFee);
+  document.getElementById('addFee-v').textContent='Rs. '+fmt(addFee);
+  document.getElementById('rent-v').textContent='Rs. '+fmt(breakdown.rent);
+  document.getElementById('util-v').textContent='Rs. '+fmt(breakdown.util);
+  document.getElementById('salFix-v').textContent='Rs. '+fmt(breakdown.salFix);
+  document.getElementById('otherFix-v').textContent='Rs. '+fmt(breakdown.otherFix);
+  document.getElementById('mktFix-v').textContent='Rs. '+fmt(breakdown.mktFix);
+  document.getElementById('vFood-v').textContent='Rs. '+fmt(breakdown.vFood);
+  document.getElementById('vEdu-v').textContent='Rs. '+fmt(breakdown.vEdu);
+  document.getElementById('vAct-v').textContent='Rs. '+fmt(breakdown.vAct);
+  document.getElementById('vMaint-v').textContent='Rs. '+fmt(breakdown.vMaint);
+
+  renderMarketingMix(breakdown.mktFix);
+
+  renderBar('fc-bar', [
+    {label:'Rent', value:breakdown.rent, color:'#3d6ea5'},
+    {label:'Utilities', value:breakdown.util, color:'#2f9488'},
+    {label:'Staff salaries', value:breakdown.salFix, color:'#c98a1f'},
+    {label:'Insurance & other', value:breakdown.otherFix, color:'#8a4a86'},
+    {label:'Marketing', value:breakdown.mktFix, color:'#c0574f'},
+    {label:'Activities (amortised)', value:breakdown.activitiesMonthly, color:'#6f8f3f'}
+  ]);
+  renderBar('vc-bar', [
+    {label:'Food & supplies', value:breakdown.vFood, color:'#3d6ea5'},
+    {label:'Educational supplies', value:breakdown.vEdu, color:'#2f9488'},
+    {label:'Activity materials', value:breakdown.vAct, color:'#c98a1f'},
+    {label:'Maintenance & contingency', value:breakdown.vMaint, color:'#8a4a86'}
+  ]);
+
+  const labels=[],rev=[],cost=[],fixed=[];
+  for(let n=0;n<=100;n+=5){ labels.push(n); rev.push(fee*n); cost.push(fc+vc*n); fixed.push(fc); }
+
+  document.getElementById('be-metrics').innerHTML =
+    metricCard('Fixed cost total', `Rs. ${fmt(fc)}`, 'per month') +
+    metricCard('Variable cost/child', `Rs. ${fmt(vc)}`, 'per month') +
+    metricCard('Effective fee/child', `Rs. ${fmt(fee)}`, addFee>0?`Rs. ${fmt(baseFee)} base + Rs. ${fmt(addFee)} extras`:'base fee only') +
+    metricCard('Contribution margin', `Rs. ${fmt(fee-vc)}`, 'per child/month');
+
+  const status = bep<=100;
+  document.getElementById('be-result').innerHTML = `<div class="result-box result-${status?'ok':'warn'}">Break-even at <strong>${Math.ceil(bep)} children</strong>. ${status?`At 30 children (a realistic near-term capacity for this market), monthly profit before depreciation is Rs. ${fmt((fee-vc)*30-fc)}.`:'Warning: break-even exceeds a realistic enrolment range — reduce fixed costs, cut variable costs, or raise the fee.'}</div>`;
+
+  if(beChart){
+    beChart.data.labels=labels;
+    beChart.data.datasets[0].data=rev;
+    beChart.data.datasets[1].data=cost;
+    beChart.data.datasets[2].data=fixed;
+    beChart.update('none');
+  }
+}
+
+// ══════════════════════════════════════════ TAB 3: GROWTH ══════════════════════════════════════════
+function initGrowth(){
+  const ctx=document.getElementById('grChart').getContext('2d');
+  grChart = new Chart(ctx,{
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'Enrolment',data:[],borderColor:'#c98a1f',borderWidth:2.5,pointRadius:0,fill:true,backgroundColor:'rgba(201,138,31,0.09)'},
+      {label:'Capacity',data:[],borderColor:'#999',borderWidth:1.5,borderDash:[6,4],pointRadius:0,fill:false},
+      {label:'Break-even',data:[],borderColor:'#3f7d5c',borderWidth:1.5,pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{
+        x:{title:{display:true,text:'Month',font:{size:11}}},
+        y:{title:{display:true,text:'Children enrolled',font:{size:11}},min:0}
+      }
+    }
+  });
+  calcGrowth();
+}
+
+function calcGrowth(){
+  const n0=+document.getElementById('n0').value, K=+document.getElementById('cap').value, r=+document.getElementById('gr').value;
+  document.getElementById('n0-v').textContent=n0;
+  document.getElementById('cap-v').textContent=K;
+  document.getElementById('gr-v').textContent=r.toFixed(2);
+
+  const {bep} = getBEInputs();
+  const months=Array.from({length:37},(_,i)=>i);
+  const N=months.map(t=>K/(1+((K-n0)/n0)*Math.exp(-r*t)));
+  const beMonth = months.find(t=>N[t]>=bep) ?? '—';
+
+  document.getElementById('gr-metrics').innerHTML =
+    metricCard('Month 6 enrolment', Math.round(N[6]), 'projected') +
+    metricCard('Month 12 enrolment', Math.round(N[12]), 'projected') +
+    metricCard('Break-even month', typeof beMonth==='number'?`Month ${beMonth}`:'Not reached', `${Math.ceil(bep)} children needed`);
+
+  if(grChart){
+    grChart.data.labels=months.map(m=>'M'+m);
+    grChart.data.datasets[0].data=N.map(v=>+v.toFixed(1));
+    grChart.data.datasets[1].data=months.map(()=>K);
+    grChart.data.datasets[2].data=months.map(()=>bep);
+    grChart.update('none');
+  }
+}
+
+// ══════════════════════════════════════════ TAB 4: PROFIT & DEPRECIATION ══════════════════════════════════════════
+const DEP_ASSETS=[
+  {key:'reno', name:'Renovation & interior design', cost:800000, life:10},
+  {key:'furn', name:'Furniture (cribs, tables, chairs, shelving)', cost:450000, life:7},
+  {key:'cctv', name:'CCTV & access control', cost:180000, life:5},
+  {key:'edu',  name:'Educational equipment & toys', cost:350000, life:5},
+  {key:'kit',  name:'Kitchen equipment & appliances', cost:200000, life:7},
+  {key:'it',   name:'IT infrastructure (PCs, tablets, Wi-Fi)', cost:250000, life:3},
+  {key:'play', name:'Outdoor playground equipment', cost:400000, life:7},
+  {key:'sign', name:'Signage & branding', cost:80000, life:5}
+];
+const NONDEP_ASSETS=[
+  {name:'Legal, licensing & registration', cost:120000},
+  {name:'Initial marketing launch campaign', cost:200000},
+  {name:'Working capital reserve (3 months)', cost:370000}
+];
+
+function initProfit(){
+  document.getElementById('pf-asset-body').innerHTML = DEP_ASSETS.map(a=>
+    `<tr>
+      <td>${a.name}</td>
+      <td><input type="number" step="10000" id="cost-${a.key}" value="${a.cost}" oninput="calcProfit()"></td>
+      <td><input type="number" class="asset-life" step="1" min="1" id="life-${a.key}" value="${a.life}" oninput="calcProfit()"></td>
+      <td id="andep-${a.key}"></td>
+      <td id="modep-${a.key}"></td>
+    </tr>`
+  ).join('');
+
+  document.getElementById('pf-nondep-body').innerHTML = NONDEP_ASSETS.map(a=>
+    `<tr><td>${a.name}</td><td>Rs. ${fmt(a.cost)}</td></tr>`
+  ).join('') + `<tr><td>Total non-depreciable</td><td>Rs. ${fmt(NONDEP_ASSETS.reduce((s,a)=>s+a.cost,0))}</td></tr>`;
+
+  const ctx=document.getElementById('pfChart').getContext('2d');
+  pfChart = new Chart(ctx,{
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'Net profit',data:[],borderColor:'#8a4a86',borderWidth:2.5,pointRadius:0,fill:true,backgroundColor:'rgba(138,74,134,0.07)'},
+      {label:'Zero line',data:[],borderColor:'#aaa',borderWidth:1,pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{
+        x:{title:{display:true,text:'Number of children enrolled',font:{size:11}}},
+        y:{title:{display:true,text:'Rs. net profit / month',font:{size:11}},ticks:{callback:v=>'Rs. '+(v/1000).toFixed(0)+'k'}}
+      }
+    }
+  });
+  calcProfit();
+}
+
+function calcProfit(){
+  const n=+document.getElementById('pfN').value;
+  document.getElementById('pfN-v').textContent=n;
+
+  const {fee,fc,vc,bep} = getBEInputs();
+
+  let annualDepTotal=0, depreciableCapex=0;
+  DEP_ASSETS.forEach(a=>{
+    const cost=existingOr(`cost-${a.key}`, a.cost);
+    const life=Math.max(1, existingOr(`life-${a.key}`, a.life));
+    const andep=cost/life, modep=andep/12;
+    annualDepTotal+=andep; depreciableCapex+=cost;
+    const andepEl=document.getElementById(`andep-${a.key}`);
+    const modepEl=document.getElementById(`modep-${a.key}`);
+    if(andepEl) andepEl.textContent='Rs. '+fmt(andep);
+    if(modepEl) modepEl.textContent='Rs. '+fmt(modep);
+  });
+  const monthlyDep = annualDepTotal/12;
+  const nonDepTotal = NONDEP_ASSETS.reduce((s,a)=>s+a.cost,0);
+  const totalCapex = depreciableCapex + nonDepTotal;
+
+  const revenue = fee*n;
+  const opCost = fc + vc*n;
+  const ebitda = revenue - opCost;
+  const netProfit = ebitda - monthlyDep;
+  const margin = revenue>0 ? (netProfit/revenue*100) : 0;
+
+  document.getElementById('pf-metrics').innerHTML =
+    metricCard('Revenue', `Rs. ${fmt(revenue)}`, `at ${n} children`) +
+    metricCard('Operating cost', `Rs. ${fmt(opCost)}`, 'fixed + variable') +
+    metricCard('EBITDA', `Rs. ${fmt(ebitda)}`, 'before depreciation') +
+    metricCard('Monthly depreciation', `Rs. ${fmt(monthlyDep)}`, 'straight-line') +
+    metricCard('Net profit', `Rs. ${fmt(netProfit)}`, `${margin.toFixed(1)}% margin`) +
+    metricCard('Total capital outlay', `Rs. ${fmt(totalCapex)}`, `Rs. ${fmt(depreciableCapex)} depreciable`);
+
+  const accBep = (fc+monthlyDep)/(fee-vc);
+  const payback = netProfit>0 ? totalCapex/netProfit : Infinity;
+  const roiAnnual = totalCapex>0 ? (netProfit*12/totalCapex*100) : 0;
+
+  document.getElementById('pf-result').innerHTML = `<div class="result-box result-${netProfit>0?'ok':'warn'}">
+    At <strong>${n} children</strong>, net profit after depreciation is <strong>Rs. ${fmt(netProfit)}/month</strong> (${margin.toFixed(1)}% margin).<br>
+    Accounting break-even (covers depreciation too) is <strong>${Math.ceil(accBep)} children</strong>, vs. cash break-even of ${Math.ceil(bep)} children on Tab 2.<br>
+    ${netProfit>0 ? `Estimated payback period: <strong>${payback.toFixed(1)} months</strong> (~${(payback/12).toFixed(1)} yrs). Annualised ROI at this enrolment: <strong>${roiAnnual.toFixed(1)}%</strong>.` : 'Net profit is negative at this enrolment — increase enrolment, raise fees, or reduce fixed/variable costs.'}
+  </div>`;
+
+  const labels=[], np=[], zero=[];
+  for(let x=0;x<=100;x+=5){ labels.push(x); np.push(fee*x-(fc+vc*x)-monthlyDep); zero.push(0); }
+  if(pfChart){
+    pfChart.data.labels=labels;
+    pfChart.data.datasets[0].data=np;
+    pfChart.data.datasets[1].data=zero;
+    pfChart.update('none');
+  }
+}
+</script>
+</body>
+</html>

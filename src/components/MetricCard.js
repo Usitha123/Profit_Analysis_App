@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { COLORS, RADIUS } from '../constants/theme';
 
 export default function MetricCard({
   label,
@@ -12,11 +13,15 @@ export default function MetricCard({
   const safeValue = (value === null || value === undefined || (typeof value === 'number' && isNaN(value)))
     ? '-'
     : String(value);
+  const accentColor = accent || COLORS.accentLP;
 
   return (
-    <View style={[styles.card, { borderTopColor: accent || '#2563eb' }, style]}>
-      <Text style={styles.label} numberOfLines={2}>{label}</Text>
-      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+    <View style={[styles.card, style]}>
+      <View style={styles.head}>
+        <View style={[styles.dot, { backgroundColor: accentColor }]} />
+        <Text style={styles.label} numberOfLines={2}>{label}</Text>
+      </View>
+      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
         {safeValue}
       </Text>
       {subtitle ? <Text style={styles.subtitle} numberOfLines={2}>{subtitle}</Text> : null}
@@ -28,41 +33,47 @@ export default function MetricCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderTopWidth: 2.5,
-    borderRadius: 12,
-    padding: 13,
-    paddingHorizontal: 11,
+    borderRadius: RADIUS.lg,
+    padding: 16,
     flexGrow: 1,
     flexShrink: 1,
-    minWidth: 145,
+    flexBasis: 150,
+    minWidth: 140,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.borderSecondary,
   },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3 },
   label: {
-    fontSize: 10,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 4,
+    fontSize: 11,
+    color: COLORS.textSecondary,
     fontWeight: '600',
-    lineHeight: 13,
+    letterSpacing: 0.2,
+    flex: 1,
+    lineHeight: 14,
   },
   value: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    letterSpacing: -0.4,
   },
   subtitle: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 2,
-    lineHeight: 14,
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 6,
+    lineHeight: 15,
   },
   sub: {
-    fontSize: 10.5,
-    color: '#64748b',
-    marginTop: 2,
-    lineHeight: 14,
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 6,
+    lineHeight: 15,
   },
 });

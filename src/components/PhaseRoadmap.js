@@ -18,7 +18,7 @@ export default function PhaseRoadmap({ phases, accent = '#3d6ea5' }) {
           <Text style={styles.time}>{phase.time}</Text>
           <Text style={styles.actions}>{phase.actions}</Text>
           <Text style={[styles.cost, { color: phase.color || accent }]}>
-            ${phase.cost.toLocaleString()}
+            Rs. {phase.cost.toLocaleString()}
           </Text>
         </View>
       ))}
@@ -36,12 +36,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   card: {
-    width: 175,
-    backgroundColor: '#f6f2e8',
-    borderRadius: 10,
-    padding: 12,
-    paddingHorizontal: 13,
+    width: 190,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 14,
     borderTopWidth: 4,
+    borderWidth: 1,
+    borderColor: '#eef0f3',
+    borderTopColor: '#eef0f3',
   },
   phase: {
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
