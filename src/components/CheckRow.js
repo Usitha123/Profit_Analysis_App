@@ -12,42 +12,52 @@ export default function CheckRow({
 }) {
   return (
     <View style={styles.row}>
-      <Switch
-        value={checked}
-        onValueChange={onToggle}
-        trackColor={{ false: '#e6e0d0', true: `${accent}66` }}
-        thumbColor={checked ? accent : '#f4f3f4'}
-        style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-      />
-      <Text style={styles.label}>{label}</Text>
-      {value !== undefined && (
-        <>
+      <View style={styles.head}>
+        <Switch
+          value={checked}
+          onValueChange={onToggle}
+          trackColor={{ false: '#e6e0d0', true: `${accent}66` }}
+          thumbColor={checked ? accent : '#f4f3f4'}
+          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+        />
+        <Text style={styles.label}>{label}</Text>
+      </View>
+      {value !== undefined ? (
+        <View style={styles.tail}>
           <TextInput
             style={styles.input}
             value={String(value)}
             onChangeText={(t) => {
-              if (onChangeValue) {
-                onChangeValue(Number(t) || 0);
-              }
+              if (onChangeValue) onChangeValue(Number(t) || 0);
             }}
             keyboardType="numeric"
           />
           {unit ? <Text style={styles.unit}>{unit}</Text> : null}
-        </>
-      )}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  head: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 9,
+  },
+  tail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 48,
   },
   label: {
     fontSize: 13,
+    lineHeight: 18,
     color: '#232a2e',
     flex: 1,
   },
@@ -61,7 +71,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
     color: '#232a2e',
     backgroundColor: '#fff',
-    width: 80,
+    width: 88,
     textAlign: 'right',
   },
   unit: {

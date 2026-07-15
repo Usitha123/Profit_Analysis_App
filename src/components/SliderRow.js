@@ -12,13 +12,22 @@ export default function SliderRow({
   formatValue,
   suffix = '',
   unit = '',
+  description,
 }) {
   const displayValue = formatValue ? formatValue(value) : value;
   const labelText = unit ? `${label} (${unit})` : label;
 
   return (
     <View style={styles.row}>
-      <Text style={styles.label}>{labelText}</Text>
+      <View style={styles.header}>
+        <View style={styles.labelWrap}>
+          <Text style={styles.label}>{labelText}</Text>
+          {description ? <Text style={styles.description}>{description}</Text> : null}
+        </View>
+        <Text style={[styles.value, { backgroundColor: `${accent}1f`, color: accent }]}>
+          {displayValue}{suffix}
+        </Text>
+      </View>
       <Slider
         value={value}
         onChange={onChange}
@@ -28,21 +37,16 @@ export default function SliderRow({
         accent={accent}
         style={styles.slider}
       />
-      <Text style={[styles.value, { backgroundColor: `${accent}1f`, color: accent }]}>
-        {displayValue}{suffix}
-      </Text>
     </View>
   );
 }
 
-// Clamp a value to [min, max] safely, returning fallback if result is NaN
 function safeClamp(val, min, max, fallback = min) {
   const n = Number(val);
   if (isNaN(n) || !isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));
 }
 
-// Custom Slider component using PanResponder and layout dimensions
 function Slider({ value, onChange, min, max, step, accent, style }) {
   const rawPct = ((value - min) / (max - min)) * 100;
   const percentage = isNaN(rawPct) || !isFinite(rawPct)
@@ -76,14 +80,10 @@ function Slider({ value, onChange, min, max, step, accent, style }) {
         const initialValue = computeValue(locationX);
         onChange(initialValue);
         startValueRef.current = initialValue;
-        startXRef.current = typeof locationX === 'number' && !isNaN(locationX)
-          ? locationX
-          : 0;
+        startXRef.current = typeof locationX === 'number' && !isNaN(locationX) ? locationX : 0;
       },
       onPanResponderMove: (evt, gestureState) => {
-        const dx = typeof gestureState?.dx === 'number' && !isNaN(gestureState.dx)
-          ? gestureState.dx
-          : 0;
+        const dx = typeof gestureState?.dx === 'number' && !isNaN(gestureState.dx) ? gestureState.dx : 0;
         const trackWidth = trackWidthRef.current || 1;
         const currentX = startXRef.current + dx;
         const ratio = Math.max(0, Math.min(1, currentX / trackWidth));
@@ -104,17 +104,22 @@ function Slider({ value, onChange, min, max, step, accent, style }) {
       <View style={styles.track} pointerEvents="none">
         <View style={[styles.fill, { width: `${percentage}%`, backgroundColor: accent }]} />
       </View>
-      <View
-        style={[styles.thumb, { left: `${percentage}%`, borderColor: accent }]}
-        pointerEvents="none"
-      />
+      <View style={[styles.thumb, { left: `${percentage}%`, borderColor: accent }]} pointerEvents="none" />
     </View>
   );
 }
 
 export function DualSlider({
-  label, value1, value2, onChange1, onChange2,
-  min = 0, max = 100, step = 1, accent = '#3d6ea5',
+  label,
+  value1,
+  value2,
+  onChange1,
+  onChange2,
+  min = 0,
+  max = 100,
+  step = 1,
+  accent = '#3d6ea5',
+  description,
 }) {
   const rawP1 = ((value1 - min) / (max - min)) * 100;
   const rawP2 = ((value2 - min) / (max - min)) * 100;
@@ -150,9 +155,7 @@ export function DualSlider({
         else if (activeThumbRef.current === 'thumb2' && val > value1) onChange2(val);
       },
       onPanResponderMove: (evt, gestureState) => {
-        const dx = typeof gestureState?.dx === 'number' && !isNaN(gestureState.dx)
-          ? gestureState.dx
-          : 0;
+        const dx = typeof gestureState?.dx === 'number' && !isNaN(gestureState.dx) ? gestureState.dx : 0;
         const trackWidth = trackWidthRef.current || 1;
         const currentX = startXRef.current + dx;
         const ratio = Math.max(0, Math.min(1, currentX / trackWidth));
@@ -171,19 +174,14 @@ export function DualSlider({
 
   return (
     <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
-      <View
-        style={styles.dualContainer}
-        onLayout={handleLayout}
-        {...panResponder.panHandlers}
-      >
+      <View style={styles.labelWrap}>
+        <Text style={styles.label}>{label}</Text>
+        {description ? <Text style={styles.description}>{description}</Text> : null}
+      </View>
+      <View style={styles.dualContainer} onLayout={handleLayout} {...panResponder.panHandlers}>
         <View style={styles.track} pointerEvents="none">
           <View
-            style={[styles.dualFill, {
-              left: `${p1}%`,
-              width: `${Math.max(0, p2 - p1)}%`,
-              backgroundColor: accent,
-            }]}
+            style={[styles.dualFill, { left: `${p1}%`, width: `${Math.max(0, p2 - p1)}%`, backgroundColor: accent }]}
           />
         </View>
         <View style={[styles.thumb, { left: `${p1}%`, borderColor: accent }]} pointerEvents="none" />
@@ -200,7 +198,7 @@ export function DualSlider({
           keyboardType="numeric"
           placeholderTextColor="#6b7178"
         />
-        <Text style={styles.dualSep}>–</Text>
+        <Text style={styles.dualSep}>-</Text>
         <TextInput
           style={[styles.dualNum, { color: accent }]}
           value={String(value2)}
@@ -218,33 +216,45 @@ export function DualSlider({
 
 const styles = StyleSheet.create({
   row: {
+    marginBottom: 14,
+  },
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 11,
+    marginBottom: 8,
+  },
+  labelWrap: {
+    flex: 1,
   },
   label: {
     fontSize: 13,
+    lineHeight: 18,
+    color: '#232a2e',
+    fontWeight: '600',
+  },
+  description: {
+    marginTop: 2,
+    fontSize: 11.5,
+    lineHeight: 17,
     color: '#6b7178',
-    minWidth: 140,
-    flex: 1,
   },
   slider: {
-    flex: 1,
+    width: '100%',
   },
   value: {
     fontFamily: 'System',
     fontSize: 12.5,
     fontWeight: '700',
-    minWidth: 82,
+    minWidth: 92,
     textAlign: 'right',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 6,
     overflow: 'hidden',
   },
   trackContainer: {
-    flex: 1,
+    width: '100%',
     height: 28,
     justifyContent: 'center',
   },
@@ -281,16 +291,17 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   dualContainer: {
-    flex: 1,
+    width: '100%',
     height: 28,
     justifyContent: 'center',
     position: 'relative',
+    marginTop: 8,
   },
   dualNums: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minWidth: 160,
+    marginTop: 8,
   },
   dualNum: {
     fontFamily: 'System',

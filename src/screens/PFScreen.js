@@ -1,306 +1,234 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TextInput, StyleSheet, Dimensions, Platform,
 } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText, G, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { DEP_ASSETS, TUITION_RATE, ENROLMENT_CAPACITY } from '../constants/modelData';
+import {
+  DEP_ASSETS,
+  ENROLMENT_CAPACITY,
+  NON_DEPRECIABLE_OUTLAY,
+  ROADMAP,
+  TUITION_RATE,
+} from '../constants/modelData';
 import MetricCard from '../components/MetricCard';
 import SliderRow from '../components/SliderRow';
 import { SectionTitle } from '../components/ResultBox';
+import ResultBox from '../components/ResultBox';
 import EquationBox from '../components/EquationBox';
 import { StackedBar } from '../components/GaugeBar';
+import InfoBox from '../components/InfoBox';
+import PhaseRoadmap from '../components/PhaseRoadmap';
+
+const { calculateProfit } = require('../utils/calculations');
 
 const ACCENT = COLORS.accentPF;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// Guard any computed number against NaN/Infinity before use in SVG or toLocaleString
-const safeNum = (n, fallback = 0) =>
-  typeof n === 'number' && isFinite(n) && !isNaN(n) ? n : fallback;
-
 export default function PFScreen() {
   const insets = useSafeAreaInsets();
-  const [enrolment, setEnrolment] = useState(40);
+  const [enrolment, setEnrolment] = useState(30);
   const [tuition, setTuition] = useState(TUITION_RATE);
-  const [operatingCosts, setOperatingCosts] = useState(18000);
+  const [operatingCost, setOperatingCost] = useState(255000);
+  const [assets, setAssets] = useState(DEP_ASSETS.map((asset) => ({ ...asset, cost: String(asset.cost), life: String(asset.life) })));
 
-  const [assets, setAssets] = useState(
-    DEP_ASSETS.map((a) => ({ ...a, cost: String(a.cost), life: String(a.life) }))
-  );
-
-  const updateAsset = (id, field, val) => {
-    setAssets((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, [field]: val } : a))
-    );
+  const updateAsset = (id, field, value) => {
+    setAssets((current) => current.map((asset) => (asset.id === id ? { ...asset, [field]: value } : asset)));
   };
 
-  const results = useMemo(() => {
-    const revenue = enrolment * tuition;
-    const totalDepreciation = assets.reduce((s, a) => {
-      const cost = Number(a.cost) || 0;
-      const life = Number(a.life) || 0;
-      const annualDep = life > 0 ? cost / life : cost;
-      return s + annualDep / 12;
-    }, 0);
-    const ebitda = revenue - operatingCosts;
-    const netProfit = ebitda - totalDepreciation;
-    const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-    const totalInvestment = assets.reduce((s, a) => s + (Number(a.cost) || 0), 0);
-    const roi = totalInvestment > 0 ? (netProfit * 12 / totalInvestment) * 100 : 0;
+  const parsedAssets = useMemo(() => assets.map((asset) => ({
+    ...asset,
+    cost: Number(asset.cost) || 0,
+    life: Number(asset.life) || 1,
+  })), [assets]);
 
-    // Projection data (12 months)
-    const projection = [];
-    for (let m = 1; m <= 12; m++) {
-      const growthFactor = 1 + (m - 1) * 0.02;
-      const mRevenue = revenue * growthFactor;
-      const mCosts = operatingCosts * growthFactor;
-      const mEbitda = mRevenue - mCosts;
-      const mNet = mEbitda - totalDepreciation;
-      projection.push({
-        month: m,
-        revenue: Math.round(mRevenue),
-        costs: Math.round(mCosts),
-        ebitda: Math.round(mEbitda),
-        net: Math.round(mNet),
-      });
-    }
+  const results = useMemo(() => calculateProfit({
+    enrolment,
+    tuition,
+    operatingCost,
+    assets: parsedAssets,
+    nonDepreciable: NON_DEPRECIABLE_OUTLAY,
+  }), [enrolment, operatingCost, parsedAssets, tuition]);
 
-    const assetLabels = assets.map((a) => a.label.split('(')[0].trim());
-    const assetValues = assets.map((a) => Number(a.cost) || 0);
-    const assetColors = ['#5b9bd5', '#70ad47', '#ffc000', '#ed7d31', '#8a4a86', '#3d6ea5'];
+  const paybackMonths = results.netProfit > 0 ? results.totalInvestment / results.netProfit : Infinity;
+  const annualisedRoi = results.roi;
 
-    return {
-      revenue,
-      totalDepreciation,
-      ebitda,
-      netProfit,
-      profitMargin,
-      totalInvestment,
-      roi,
-      projection,
-      assetLabels,
-      assetValues,
-      assetColors,
-    };
-  }, [enrolment, tuition, operatingCosts, assets]);
+  const projection = [];
+  for (let month = 1; month <= 12; month += 1) {
+    const revenue = Math.round(results.revenue * (1 + (month - 1) * 0.02));
+    const costs = Math.round(operatingCost * (1 + (month - 1) * 0.015));
+    const net = Math.round(revenue - costs - results.totalDepreciation);
+    projection.push({ month, revenue, costs, net });
+  }
 
-  // Chart
-  const chartW = Math.min(SCREEN_WIDTH - 76, 400);
+  const chartW = Math.min(SCREEN_WIDTH - 68, 420);
   const chartH = 240;
-  const pad = { top: 20, right: 10, bottom: 30, left: 55 };
+  const pad = { top: 20, right: 12, bottom: 32, left: 52 };
   const plotW = chartW - pad.left - pad.right;
   const plotH = chartH - pad.top - pad.bottom;
-
-  const maxChartVal = Math.max(
-    ...results.projection.map((d) => Math.max(safeNum(d.revenue), safeNum(d.net) + safeNum(d.costs))),
-    1
-  );
-
-  const toX = (m) => {
-    const x = pad.left + ((m - 1) / 11) * plotW;
-    return safeNum(x, pad.left);
-  };
-  const toY = (v) => {
-    const y = pad.top + plotH - (safeNum(v) / maxChartVal) * plotH;
-    return safeNum(y, pad.top + plotH);
-  };
-
-  const revPts = results.projection.map((d) => `${toX(d.month)},${toY(d.revenue)}`).join(' ');
-  const netPts = results.projection.map((d) => `${toX(d.month)},${toY(d.net)}`).join(' ');
+  const maxVal = Math.max(...projection.map((row) => Math.max(row.revenue, row.costs)), 1);
+  const toX = (value) => pad.left + ((value - 1) / 11) * plotW;
+  const toY = (value) => pad.top + plotH - (value / maxVal) * plotH;
+  const revenuePoints = projection.map((row) => `${toX(row.month)},${toY(row.revenue)}`).join(' ');
+  const netPoints = projection.map((row) => `${toX(row.month)},${toY(Math.max(row.net, 0))}`).join(' ');
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 26 }]}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.intro}>
-        Analyse profitability, depreciation, and return on investment.
-        Manage capital assets, operating costs, and revenue projections.
+        Profit is where the operating model meets the capital plan. This tab separates monthly operating
+        profit from depreciation, then keeps non-depreciable launch outlays visible for payback planning.
       </Text>
 
-      {/* Key Metrics */}
-      <View style={styles.grid3}>
-        <MetricCard label="Monthly Revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="EBITDA" value={`Rs. ${Math.round(results.ebitda).toLocaleString()}`} accent={ACCENT} subtitle="Earnings before depreciation" />
-        <MetricCard label="Net Profit" value={`Rs. ${Math.round(results.netProfit).toLocaleString()}`} accent={results.netProfit >= 0 ? ACCENT : COLORS.accentRed} />
-        <MetricCard label="Profit Margin" value={`${results.profitMargin.toFixed(1)}%`} accent={results.profitMargin >= 0 ? ACCENT : COLORS.accentRed} />
-        <MetricCard label="Total Investment" value={`Rs. ${results.totalInvestment.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Annual ROI" value={`${results.roi.toFixed(1)}%`} accent={results.roi >= 0 ? ACCENT : COLORS.accentRed} />
+      <View style={styles.metrics}>
+        <MetricCard label="Monthly revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Net profit" value={`Rs. ${Math.round(results.netProfit).toLocaleString()}`} subtitle="after depreciation" accent={results.netProfit >= 0 ? ACCENT : COLORS.accentRed} />
+        <MetricCard label="Payback" value={Number.isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} mo` : 'Not reached'} accent={ACCENT} />
+        <MetricCard label="Annual ROI" value={`${annualisedRoi.toFixed(1)}%`} accent={annualisedRoi >= 0 ? ACCENT : COLORS.accentRed} />
       </View>
 
-      {/* Inputs */}
-      <SectionTitle accent={ACCENT}>Key Drivers</SectionTitle>
+      <InfoBox
+        title="Variables to determine"
+        accent={ACCENT}
+        items={[
+          { label: 'Capital items:', text: 'Replace every cost and useful life with your actual quotation or planning assumption.' },
+          { label: 'Non-depreciable launch outlay:', text: 'Legal fees, launch marketing, and working capital are real cash out but should not sit inside depreciation.' },
+          { label: 'Interpretation:', text: 'Positive net profit does not mean the business has recovered startup cash yet. That is why payback is shown separately.' },
+        ]}
+      />
+
+      <SectionTitle accent={ACCENT}>Profit formula</SectionTitle>
       <EquationBox accent={ACCENT}>
-        Net Profit = Revenue − Operating Costs − Depreciation{'\n'}
-        ROI = (Annual Net Profit / Total Investment) × 100
+        Net profit = revenue - operating cost - depreciation
+        {'\n'}
+        ROI = annual net profit / depreciable capital investment
       </EquationBox>
 
       <SliderRow
-        label="Enrolment"
+        label="Children enrolled"
         unit="children"
         value={enrolment}
         onChange={setEnrolment}
-        min={5}
+        min={10}
         max={ENROLMENT_CAPACITY}
         step={1}
         accent={ACCENT}
       />
 
       <SliderRow
-        label="Tuition Fee"
-        unit="Rs./mo"
+        label="Monthly fee per child"
+        unit="Rs."
         value={tuition}
         onChange={setTuition}
-        min={500}
-        max={2000}
-        step={25}
+        min={15000}
+        max={70000}
+        step={500}
         accent={ACCENT}
-        formatValue={(v) => `Rs. ${v}`}
+        formatValue={(value) => `Rs. ${value.toLocaleString()}`}
       />
 
       <SliderRow
-        label="Operating Costs"
-        unit="Rs./mo"
-        value={operatingCosts}
-        onChange={setOperatingCosts}
-        min={5000}
-        max={50000}
-        step={500}
+        label="Operating cost before depreciation"
+        unit="Rs."
+        value={operatingCost}
+        onChange={setOperatingCost}
+        min={100000}
+        max={700000}
+        step={5000}
         accent={ACCENT}
-        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
+        formatValue={(value) => `Rs. ${value.toLocaleString()}`}
       />
 
-      {/* Capital Assets & Depreciation */}
-      <SectionTitle accent={ACCENT}>Capital Assets & Depreciation</SectionTitle>
-      <Text style={styles.note}>
-        Each asset's monthly depreciation = (asset cost) / (useful life × 12 months).
-        Changing the cost or life updates the depreciation schedule.
-      </Text>
-
+      <SectionTitle accent={ACCENT}>Capital assets and depreciation</SectionTitle>
       <View style={styles.assetTable}>
         <View style={styles.assetHeader}>
-          <Text style={[styles.assetHeaderCell, { flex: 2 }]}>Asset</Text>
+          <Text style={[styles.assetHeaderCell, { flex: 2.1 }]}>Asset</Text>
           <Text style={styles.assetHeaderCell}>Cost</Text>
-          <Text style={styles.assetHeaderCell}>Life (yr)</Text>
-          <Text style={[styles.assetHeaderCell, { textAlign: 'right' }]}>Depr/mo</Text>
+          <Text style={styles.assetHeaderCell}>Life</Text>
+          <Text style={[styles.assetHeaderCell, { textAlign: 'right' }]}>Dep./mo</Text>
         </View>
-        {assets.map((a) => {
-          const cost = Number(a.cost) || 0;
-          const life = Number(a.life) || 0;
-          const monthlyDep = life > 0 ? (cost / (life * 12)) : cost;
+        {parsedAssets.map((asset) => {
+          const monthlyDep = asset.life > 0 ? asset.cost / (asset.life * 12) : asset.cost;
           return (
-            <View key={a.id} style={styles.assetRow}>
-              <Text style={[styles.assetCell, { flex: 2 }]}>{a.label}</Text>
+            <View key={asset.id} style={styles.assetRow}>
+              <Text style={[styles.assetCell, { flex: 2.1 }]}>{asset.label}</Text>
               <TextInput
                 style={styles.assetInput}
-                value={a.cost}
-                onChangeText={(t) => updateAsset(a.id, 'cost', t)}
+                value={String(assets.find((item) => item.id === asset.id)?.cost ?? asset.cost)}
+                onChangeText={(value) => updateAsset(asset.id, 'cost', value)}
                 keyboardType="numeric"
-                placeholderTextColor="#6b7178"
               />
               <TextInput
-                style={[styles.assetInput, { width: 44 }]}
-                value={a.life}
-                onChangeText={(t) => updateAsset(a.id, 'life', t)}
+                style={[styles.assetInput, styles.lifeInput]}
+                value={String(assets.find((item) => item.id === asset.id)?.life ?? asset.life)}
+                onChangeText={(value) => updateAsset(asset.id, 'life', value)}
                 keyboardType="numeric"
-                placeholderTextColor="#6b7178"
               />
-              <Text style={styles.assetVal}>
-                Rs. {Math.round(monthlyDep).toLocaleString()}
-              </Text>
+              <Text style={styles.assetValue}>Rs. {Math.round(monthlyDep).toLocaleString()}</Text>
             </View>
           );
         })}
-        <View style={[styles.assetRow, styles.assetTotal]}>
-          <Text style={[styles.assetCell, { flex: 2, fontWeight: '700' }]}>Total</Text>
-          <Text style={styles.assetVal}>
-            Rs. {assets.reduce((s, a) => s + (Number(a.cost) || 0), 0).toLocaleString()}
-          </Text>
-          <Text style={styles.assetVal}></Text>
-          <Text style={[styles.assetVal, { fontWeight: '700' }]}>
-            Rs. {Math.round(results.totalDepreciation).toLocaleString()}
-          </Text>
-        </View>
       </View>
 
-      {/* Asset Allocation */}
-      <SectionTitle accent={ACCENT}>Capital Allocation</SectionTitle>
+      <SectionTitle accent={ACCENT}>Non-depreciable launch outlay</SectionTitle>
+      {NON_DEPRECIABLE_OUTLAY.map((item) => (
+        <View key={item.id} style={styles.nonDepRow}>
+          <Text style={styles.nonDepLabel}>{item.label}</Text>
+          <Text style={styles.nonDepValue}>Rs. {item.cost.toLocaleString()}</Text>
+        </View>
+      ))}
+
+      {results.netProfit >= 0 ? (
+        <ResultBox type="ok">
+          Net profit after depreciation is Rs. {Math.round(results.netProfit).toLocaleString()} per month.
+          {Number.isFinite(paybackMonths) ? ` Estimated payback period is ${paybackMonths.toFixed(1)} months.` : ''}
+        </ResultBox>
+      ) : (
+        <ResultBox type="warn">
+          Net profit is negative after depreciation. Increase enrolment, raise the fee, or lower operating
+          cost before relying on this business case.
+        </ResultBox>
+      )}
+
+      <SectionTitle accent={ACCENT}>Capital allocation</SectionTitle>
       <StackedBar
-        segments={results.assetValues}
-        colors={results.assetColors}
-        labels={results.assetLabels}
+        segments={parsedAssets.map((asset) => asset.cost)}
+        colors={['#3d6ea5', '#2f8f83', '#c98a1f', '#8a4a86', '#c0574f', '#70ad47', '#ed7d31', '#6b7178']}
+        labels={parsedAssets.map((asset) => asset.label)}
       />
 
-      {/* 12-Month Projection Chart */}
-      <SectionTitle accent={ACCENT}>12-Month Financial Projection</SectionTitle>
+      <SectionTitle accent={ACCENT}>12-month projection</SectionTitle>
       <View style={styles.chartContainer}>
         <Svg width={chartW} height={chartH}>
-          <SvgText x={8} y={12} fontSize={9} fill="#6b7178" textAnchor="start">
-            Rs.
-          </SvgText>
-
-          {[0, 0.25, 0.5, 0.75, 1].map((r) => (
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
             <Line
-              key={r}
+              key={ratio}
               x1={pad.left}
-              y1={pad.top + plotH * (1 - r)}
+              y1={pad.top + plotH * (1 - ratio)}
               x2={chartW - pad.right}
-              y2={pad.top + plotH * (1 - r)}
+              y2={pad.top + plotH * (1 - ratio)}
               stroke="#eee9dc"
               strokeWidth={1}
               strokeDasharray="4,4"
             />
           ))}
-
-          <Polyline points={revPts} fill="none" stroke={COLORS.accentLP} strokeWidth={2.5} />
-          <Polyline points={netPts} fill="none" stroke={ACCENT} strokeWidth={2.5} />
-
-          {[1, 4, 7, 10, 12].map((m) => (
-            <SvgText
-              key={m}
-              x={toX(m)}
-              y={chartH - 4}
-              fontSize={8}
-              fill="#6b7178"
-              textAnchor="middle"
-            >
-              M{m}
-            </SvgText>
-          ))}
-
+          <Polyline points={revenuePoints} fill="none" stroke={COLORS.accentLP} strokeWidth={2.5} />
+          <Polyline points={netPoints} fill="none" stroke={ACCENT} strokeWidth={2.5} />
           <G x={chartW - 140} y={8}>
             <Rect x={0} y={0} width={10} height={3} rx={1.5} fill={COLORS.accentLP} />
             <SvgText x={15} y={4} fontSize={9} fill="#6b7178">Revenue</SvgText>
             <Rect x={70} y={0} width={10} height={3} rx={1.5} fill={ACCENT} />
-            <SvgText x={85} y={4} fontSize={9} fill="#6b7178">Net Profit</SvgText>
+            <SvgText x={85} y={4} fontSize={9} fill="#6b7178">Net profit</SvgText>
           </G>
         </Svg>
       </View>
 
-      {/* Monthly projection table */}
-      <SectionTitle accent={ACCENT}>Monthly Summary</SectionTitle>
-      <View style={styles.table}>
-        <View style={styles.tableHeader}>
-          {['Month', 'Revenue', 'Costs', 'EBITDA', 'Net'].map((h) => (
-            <Text key={h} style={styles.th}>{h}</Text>
-          ))}
-        </View>
-        {results.projection.map((d) => (
-          <View key={d.month} style={styles.tr}>
-            <Text style={styles.td}>{d.month}</Text>
-            <Text style={styles.td}>Rs. {d.revenue.toLocaleString()}</Text>
-            <Text style={styles.td}>Rs. {d.costs.toLocaleString()}</Text>
-            <Text style={[styles.td, { color: d.ebitda >= 0 ? COLORS.textSuccess : COLORS.accentRed }]}>
-              Rs. {d.ebitda.toLocaleString()}
-            </Text>
-            <Text style={[styles.td, { color: d.net >= 0 ? COLORS.textSuccess : COLORS.accentRed }]}>
-              Rs. {d.net.toLocaleString()}
-            </Text>
-          </View>
-        ))}
-      </View>
+      <SectionTitle accent={ACCENT}>Phase roadmap</SectionTitle>
+      <PhaseRoadmap phases={ROADMAP} accent={ACCENT} />
     </ScrollView>
   );
 }
@@ -311,34 +239,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: {
-    padding: 26,
+    paddingHorizontal: 18,
+    paddingTop: 18,
   },
   intro: {
     fontSize: 13.5,
     color: '#6b7178',
-    lineHeight: 22,
-    marginBottom: 16,
+    lineHeight: 21,
+    marginBottom: 14,
   },
-  grid3: {
+  metrics: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  note: {
-    fontSize: 12,
-    color: '#6b7178',
-    lineHeight: 20,
-    marginBottom: 12,
-    paddingLeft: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: '#e6e0d0',
+    gap: 10,
   },
   chartContainer: {
     backgroundColor: '#f6f2e8',
     borderRadius: 10,
     padding: 12,
-    marginTop: 8,
     alignItems: 'center',
   },
   assetTable: {
@@ -346,95 +264,76 @@ const styles = StyleSheet.create({
     borderColor: '#d8d1bf',
     borderRadius: 10,
     overflow: 'hidden',
-    marginBottom: 12,
+    backgroundColor: '#fff',
   },
   assetHeader: {
     flexDirection: 'row',
     backgroundColor: '#f6f2e8',
+    paddingHorizontal: 10,
     paddingVertical: 8,
-    paddingHorizontal: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e6e0d0',
   },
   assetHeaderCell: {
     flex: 1,
     fontSize: 10.5,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#6b7178',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   assetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee9dc',
-  },
-  assetTotal: {
-    backgroundColor: '#f6f2e8',
-    borderBottomWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#eee9dc',
   },
   assetCell: {
-    fontSize: 11,
-    color: '#232a2e',
     flex: 1,
+    fontSize: 11.5,
+    color: '#232a2e',
+    lineHeight: 16,
   },
   assetInput: {
+    width: 82,
     borderWidth: 1.5,
     borderColor: '#d8d1bf',
     borderRadius: 6,
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'System',
-    color: '#232a2e',
+    paddingVertical: 4,
     backgroundColor: '#fff',
-    width: 72,
     textAlign: 'right',
-    marginRight: 4,
-  },
-  assetVal: {
-    fontSize: 11,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    color: '#6b7178',
+    fontSize: 11.5,
+    color: '#232a2e',
+    marginLeft: 6,
+  },
+  lifeInput: {
+    width: 54,
+  },
+  assetValue: {
     flex: 1,
-    textAlign: 'right',
-  },
-  table: {
-    borderWidth: 1.5,
-    borderColor: '#d8d1bf',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f6f2e8',
-    paddingVertical: 8,
-    paddingHorizontal: 9,
-  },
-  th: {
-    flex: 1,
-    fontSize: 10.5,
-    fontWeight: '600',
+    fontSize: 11.5,
     color: '#6b7178',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
     textAlign: 'right',
+    marginLeft: 6,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
-  tr: {
+  nonDepRow: {
     flexDirection: 'row',
-    paddingVertical: 7,
-    paddingHorizontal: 9,
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee9dc',
   },
-  td: {
+  nonDepLabel: {
     flex: 1,
-    fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontSize: 13,
     color: '#232a2e',
-    textAlign: 'right',
+  },
+  nonDepValue: {
+    fontSize: 12.5,
+    color: '#6b7178',
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
 });

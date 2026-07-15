@@ -1,30 +1,33 @@
 export const COLORS = {
   backgroundPrimary: '#ffffff',
-  backgroundSecondary: '#f6f2e8',
-  backgroundPage: '#f1ece0',
-  backgroundSuccess: '#eaf6ee',
-  backgroundWarning: '#fdf3e2',
-  textPrimary: '#232a2e',
-  textSecondary: '#6b7178',
-  textSuccess: '#2f7a4f',
-  textWarning: '#a06a12',
-  textDanger: '#a83e3e',
-  borderPrimary: '#d8d1bf',
-  borderSecondary: '#e6e0d0',
-  borderTertiary: '#eee9dc',
-  borderSuccess: '#bfe2ca',
-  borderWarning: '#f0dcae',
+  backgroundSecondary: '#f8fafc',
+  backgroundPage: '#f4f7fb',
+  backgroundElevated: '#ffffff',
+  backgroundSuccess: '#ecfdf3',
+  backgroundWarning: '#fff7ed',
+  textPrimary: '#0f172a',
+  textSecondary: '#64748b',
+  textMuted: '#94a3b8',
+  textSuccess: '#166534',
+  textWarning: '#c2410c',
+  textDanger: '#b91c1c',
+  borderPrimary: '#cbd5e1',
+  borderSecondary: '#e2e8f0',
+  borderTertiary: '#eef2f7',
+  borderSuccess: '#bbf7d0',
+  borderWarning: '#fed7aa',
 
-  accentLP: '#3d6ea5',    // denim — staffing
-  accentCO: '#2f8f83',    // teal — cost optimisation
-  accentBE: '#3f7d5c',    // green — break-even
-  accentGR: '#c98a1f',    // marigold — growth
-  accentPF: '#8a4a86',    // plum — profit
-  accentRed: '#c0574f',
+  accentLP: '#2563eb',
+  accentCO: '#0891b2',
+  accentBE: '#059669',
+  accentGR: '#d97706',
+  accentPF: '#7c3aed',
+  accentRed: '#dc2626',
+  shadow: 'rgba(15, 23, 42, 0.08)',
 };
 
 export const SIZES = {
-  radius: 10,
+  radius: 12,
   padding: 16,
   smallPadding: 12,
 };

@@ -1,224 +1,280 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, ScrollView, TextInput, StyleSheet, Platform,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { FIXED_COSTS, TUITION_RATE, ENROLMENT_CAPACITY } from '../constants/modelData';
+import {
+  COST_REFERENCE,
+  ENROLMENT_CAPACITY,
+  FIXED_COST_RANGES,
+  PER_CHILD_COST_RANGES,
+  STAFF_ROLES,
+} from '../constants/modelData';
 import MetricCard from '../components/MetricCard';
+import { DualSlider } from '../components/SliderRow';
 import SliderRow from '../components/SliderRow';
 import { SectionTitle } from '../components/ResultBox';
-import GaugeBar from '../components/GaugeBar';
+import ResultBox from '../components/ResultBox';
 import EquationBox from '../components/EquationBox';
+import InfoBox from '../components/InfoBox';
+import DataTable from '../components/DataTable';
+import ReferenceStrip from '../components/ReferenceStrip';
+import GaugeBar from '../components/GaugeBar';
 
 const ACCENT = COLORS.accentCO;
 
+function scaleRanges(baseRanges, factor) {
+  return baseRanges.map((item) => ({
+    ...item,
+    min: Math.round(item.min * factor),
+    max: Math.round(item.max * factor),
+  }));
+}
+
 export default function COScreen() {
   const insets = useSafeAreaInsets();
-  const [enrolment, setEnrolment] = useState(35);
-  const [tuition, setTuition] = useState(TUITION_RATE);
-  const [tenure, setTenure] = useState(60);
+  const [enrolment, setEnrolment] = useState(30);
+  const [budgetCap, setBudgetCap] = useState(650000);
+  const [fixedRanges, setFixedRanges] = useState(FIXED_COST_RANGES);
+  const [perChildRanges, setPerChildRanges] = useState(PER_CHILD_COST_RANGES);
 
-  const [fixedCosts, setFixedCosts] = useState(
-    FIXED_COSTS.map((c) => ({ ...c }))
-  );
+  const staffFloor = useMemo(() => {
+    const infant = Math.round(enrolment * 0.18);
+    const toddler = Math.round(enrolment * 0.27);
+    const preschool = Math.round(enrolment * 0.33);
+    const schoolage = enrolment - infant - toddler - preschool;
 
-  const [variableRange, setVariableRange] = useState({ min: 800, max: 2000 });
-  const [minInput, setMinInput] = useState('800');
-  const [maxInput, setMaxInput] = useState('2000');
+    const teacherCount = Math.ceil(preschool / 8) + Math.ceil(schoolage / 12);
+    const caretakerCount = Math.ceil(infant / 3);
+    const helperCount = Math.ceil(toddler / 5);
 
-  const updateFixedCost = useCallback((id, val) => {
-    setFixedCosts((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, value: val } : c))
-    );
-  }, []);
-
-  const handleMinChange = (text) => {
-    setMinInput(text);
-    const val = Number(text);
-    if (!isNaN(val) && val >= 0) {
-      setVariableRange((p) => ({ ...p, min: val }));
-    }
-  };
-
-  const handleMaxChange = (text) => {
-    setMaxInput(text);
-    const val = Number(text);
-    if (!isNaN(val) && val >= 0) {
-      setVariableRange((p) => ({ ...p, max: val }));
-    }
-  };
-
-  const handleMinBlur = () => {
-    let val = Number(minInput);
-    if (isNaN(val) || val < 0) {
-      val = 0;
-    }
-    const maxVal = variableRange.max;
-    if (val > maxVal - 50) {
-      val = Math.max(0, maxVal - 50);
-    }
-    setVariableRange((p) => ({ ...p, min: val }));
-    setMinInput(String(val));
-  };
-
-  const handleMaxBlur = () => {
-    let val = Number(maxInput);
-    if (isNaN(val) || val < 0) {
-      val = 0;
-    }
-    const minVal = variableRange.min;
-    if (val < minVal + 50) {
-      val = minVal + 50;
-    }
-    setVariableRange((p) => ({ ...p, max: val }));
-    setMaxInput(String(val));
-  };
+    return STAFF_ROLES.reduce((sum, role) => {
+      if (role.id === 'manager' || role.id === 'security') return sum + role.salary;
+      if (role.id === 'teacher') return sum + teacherCount * role.salary;
+      if (role.id === 'baby') return sum + caretakerCount * role.salary;
+      if (role.id === 'helper') return sum + helperCount * role.salary;
+      return sum;
+    }, 0);
+  }, [enrolment]);
 
   const results = useMemo(() => {
-    const totalFixed = fixedCosts.reduce((s, c) => s + c.value, 0);
-    const avgVarCost = (variableRange.min + variableRange.max) / 2;
-    const totalVariable = avgVarCost * enrolment;
-    const totalCost = totalFixed + totalVariable;
-    const revenue = enrolment * tuition;
-    const surplus = revenue - totalCost;
-    const costPerChild = enrolment > 0 ? totalCost / enrolment : 0;
-    const varCostPerChild = avgVarCost;
-    const totalBudget = totalFixed + 2000 * enrolment;
+    const fixedRows = fixedRanges.map((item) => ({
+      ...item,
+      source: 'Own range',
+      totalMin: item.min,
+      totalMax: item.max,
+    }));
+
+    const variableRows = perChildRanges.map((item) => ({
+      ...item,
+      source: `Rs. ${item.min.toLocaleString()}-${item.max.toLocaleString()} per child x ${enrolment}`,
+      totalMin: item.min * enrolment,
+      totalMax: item.max * enrolment,
+    }));
+
+    const totalMin = fixedRows.reduce((sum, item) => sum + item.totalMin, 0)
+      + variableRows.reduce((sum, item) => sum + item.totalMin, 0)
+      + staffFloor;
+
+    const totalMax = fixedRows.reduce((sum, item) => sum + item.totalMax, 0)
+      + variableRows.reduce((sum, item) => sum + item.totalMax, 0)
+      + staffFloor;
+
+    const perChildMin = perChildRanges.reduce((sum, item) => sum + item.min, 0);
+    const perChildMax = perChildRanges.reduce((sum, item) => sum + item.max, 0);
 
     return {
-      totalFixed,
-      avgVarCost,
-      totalVariable,
-      totalCost,
-      revenue,
-      surplus,
-      costPerChild,
-      varCostPerChild,
-      totalBudget,
-      costPct: totalBudget > 0 ? Math.round((totalCost / totalBudget) * 100) : 0,
+      fixedRows,
+      variableRows,
+      totalMin,
+      totalMax,
+      perChildMin,
+      perChildMax,
+      feasible: totalMin <= budgetCap,
+      budgetGap: budgetCap - totalMin,
     };
-  }, [fixedCosts, variableRange, enrolment, tuition]);
+  }, [budgetCap, enrolment, fixedRanges, perChildRanges, staffFloor]);
+
+  const updateFixedRange = (id, nextMin, nextMax) => {
+    setFixedRanges((current) => current.map((item) => (
+      item.id === id ? { ...item, min: nextMin, max: nextMax } : item
+    )));
+  };
+
+  const updatePerChildRange = (id, nextMin, nextMax) => {
+    setPerChildRanges((current) => current.map((item) => (
+      item.id === id ? { ...item, min: nextMin, max: nextMax } : item
+    )));
+  };
+
+  const autoSuggest = () => {
+    const sizeFactor = enrolment / 30;
+    setFixedRanges(scaleRanges(FIXED_COST_RANGES, sizeFactor));
+    setPerChildRanges(PER_CHILD_COST_RANGES);
+  };
+
+  const tableRows = [
+    ...results.fixedRows.map((item) => ([
+      item.label,
+      `Rs. ${item.totalMin.toLocaleString()} - ${item.totalMax.toLocaleString()}`,
+      item.source,
+    ])),
+    [
+      'Staff floor',
+      `Rs. ${staffFloor.toLocaleString()}`,
+      'Computed from staffing model',
+    ],
+    ...results.variableRows.map((item) => ([
+      item.label,
+      `Rs. ${item.totalMin.toLocaleString()} - ${item.totalMax.toLocaleString()}`,
+      item.source,
+    ])),
+    [
+      'Minimum feasible cost C*',
+      `Rs. ${results.totalMin.toLocaleString()}`,
+      `At n = ${enrolment}`,
+    ],
+    [
+      'Maximum plausible cost',
+      `Rs. ${results.totalMax.toLocaleString()}`,
+      'Upper end of all ranges',
+    ],
+  ];
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 26 }]}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.intro}>
-        Balance fixed and variable costs to optimise your daycare's cost structure.
-        Adjust enrolment, tuition fees, and expense items below.
+        This model treats every category as a lower-bound spending range. The minimum feasible allocation
+        always sits at the low end of each range, then the app checks whether that total still fits your
+        launch budget.
       </Text>
 
-      {/* Metrics */}
-      <View style={styles.grid3}>
-        <MetricCard label="Total Cost" value={`Rs. ${results.totalCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard
-          label="Surplus"
-          value={`Rs. ${results.surplus.toLocaleString()}`}
-          accent={results.surplus >= 0 ? ACCENT : COLORS.accentRed}
-          subtitle={results.surplus >= 0 ? 'Profitable' : 'Loss'}
-        />
-        <MetricCard label="Cost / Child" value={`Rs. ${Math.round(results.costPerChild)}`} accent={ACCENT} />
-        <MetricCard label="Fixed Costs" value={`Rs. ${results.totalFixed.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Variable Costs" value={`Rs. ${results.totalVariable.toLocaleString()}`} accent={ACCENT} />
+      <View style={styles.metrics}>
+        <MetricCard label="Children (n)" value={enrolment} accent={ACCENT} />
+        <MetricCard label="Per-child subtotal" value={`Rs. ${results.perChildMin.toLocaleString()}-${results.perChildMax.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Minimum feasible cost" value={`Rs. ${results.totalMin.toLocaleString()}`} subtitle={`Budget cap Rs. ${budgetCap.toLocaleString()}`} accent={ACCENT} />
       </View>
 
-      {/* Gauge */}
-      <SectionTitle accent={ACCENT}>Budget Utilisation</SectionTitle>
-      <GaugeBar
-        label="Cost vs Budget"
-        value={results.totalCost}
-        max={results.totalBudget}
+      <InfoBox
+        title="How this model is built"
         accent={ACCENT}
-        format={(v) => `${Math.round((v / results.totalBudget) * 100)}%`}
+        items={[
+          { label: 'Staff floor:', text: 'It is not guessed. It is recomputed from the staffing logic at the chosen enrolment.' },
+          { label: 'Fixed costs:', text: 'These do not scale per child, but they still widen as you choose a larger centre.' },
+          { label: 'Variable costs:', text: 'Food, supplies, materials, and maintenance scale directly with enrolment.' },
+          { label: 'Objective:', text: 'Because all coefficients are positive, the minimum-cost solution binds every category at its floor.' },
+        ]}
       />
 
-      {/* Key Drivers */}
-      <SectionTitle accent={ACCENT}>Key Drivers</SectionTitle>
+      <SectionTitle accent={ACCENT}>Cost structure</SectionTitle>
       <EquationBox accent={ACCENT}>
-        Total Cost = Fixed Costs + (Avg Variable Cost × Enrolment)
+        Total cost = fixed ranges + staffing floor + (per-child ranges x n)
       </EquationBox>
 
       <SliderRow
-        label="Enrolment"
+        label="Target enrolment"
         unit="children"
         value={enrolment}
         onChange={setEnrolment}
-        min={5}
+        min={10}
         max={ENROLMENT_CAPACITY}
         step={1}
         accent={ACCENT}
       />
 
       <SliderRow
-        label="Tuition Fee"
-        unit="Rs./mo"
-        value={tuition}
-        onChange={setTuition}
-        min={500}
-        max={2000}
-        step={25}
+        label="Monthly budget cap"
+        unit="Rs."
+        value={budgetCap}
+        onChange={setBudgetCap}
+        min={400000}
+        max={1500000}
+        step={10000}
         accent={ACCENT}
-        formatValue={(v) => `Rs. ${v}`}
+        formatValue={(value) => `Rs. ${value.toLocaleString()}`}
       />
 
-      <SliderRow
-        label="Avg Tenure"
-        unit="months"
-        value={tenure}
-        onChange={setTenure}
-        min={6}
-        max={48}
-        step={1}
-        accent={ACCENT}
-        formatValue={(v) => `${v} mo`}
-      />
-
-      {/* Variable Cost Range */}
-      <SectionTitle accent={ACCENT}>Variable Cost per Child</SectionTitle>
-      <Text style={styles.note}>
-        Set the range of monthly variable costs per enrolled child (supplies, meals, activities).
-      </Text>
-      <View style={styles.dualRow}>
-        <Text style={styles.dualLabel}>Range</Text>
-        <View style={styles.dualInputs}>
-          <TextInput
-            style={[styles.dualInput, { color: ACCENT }]}
-            value={minInput}
-            onChangeText={handleMinChange}
-            onBlur={handleMinBlur}
-            keyboardType="numeric"
-          />
-          <Text style={styles.dualSep}>–</Text>
-          <TextInput
-            style={[styles.dualInput, { color: ACCENT }]}
-            value={maxInput}
-            onChangeText={handleMaxChange}
-            onBlur={handleMaxBlur}
-            keyboardType="numeric"
-          />
-        </View>
-      </View>
-
-      {/* Fixed Costs */}
-      <SectionTitle accent={ACCENT}>Fixed Costs</SectionTitle>
-      {fixedCosts.map((c) => (
-        <SliderRow
-          key={c.id}
-          label={c.label}
-          unit="Rs./mo"
-          value={c.value}
-          onChange={(v) => updateFixedCost(c.id, v)}
+      <SectionTitle accent={ACCENT}>Fixed monthly ranges</SectionTitle>
+      {fixedRanges.map((item) => (
+        <DualSlider
+          key={item.id}
+          label={item.label}
+          value1={item.min}
+          value2={item.max}
+          onChange1={(value) => updateFixedRange(item.id, value, item.max)}
+          onChange2={(value) => updateFixedRange(item.id, item.min, value)}
           min={0}
-          max={10000}
-          step={50}
+          max={120000}
+          step={2500}
           accent={ACCENT}
-          formatValue={(v) => `Rs. ${v.toLocaleString()}`}
+          description="Drag both ends of the range"
         />
       ))}
+
+      <SectionTitle accent={ACCENT}>Per-child ranges</SectionTitle>
+      {perChildRanges.map((item) => (
+        <DualSlider
+          key={item.id}
+          label={item.label}
+          value1={item.min}
+          value2={item.max}
+          onChange1={(value) => updatePerChildRange(item.id, value, item.max)}
+          onChange2={(value) => updatePerChildRange(item.id, item.min, value)}
+          min={0}
+          max={500}
+          step={10}
+          accent={ACCENT}
+          description="Per child per month"
+        />
+      ))}
+
+      <Text onPress={autoSuggest} style={styles.autoSuggest}>
+        Auto-suggest starter ranges
+      </Text>
+
+      <SectionTitle accent={ACCENT}>Budget utilisation</SectionTitle>
+      <GaugeBar
+        label="Minimum feasible"
+        value={results.totalMin}
+        max={Math.max(results.totalMax, budgetCap)}
+        accent={results.feasible ? ACCENT : COLORS.accentRed}
+        format={() => `Rs. ${results.totalMin.toLocaleString()}`}
+      />
+      <GaugeBar
+        label="Budget cap"
+        value={budgetCap}
+        max={Math.max(results.totalMax, budgetCap)}
+        accent={COLORS.accentGR}
+        format={() => `Rs. ${budgetCap.toLocaleString()}`}
+      />
+
+      {results.feasible ? (
+        <ResultBox type="ok">
+          Feasible. The minimum-cost allocation is Rs. {results.totalMin.toLocaleString()} per month, leaving
+          Rs. {results.budgetGap.toLocaleString()} of slack before you hit the budget cap.
+        </ResultBox>
+      ) : (
+        <ResultBox type="warn">
+          Infeasible. Even the minimum-cost allocation is Rs. {results.totalMin.toLocaleString()}, which exceeds
+          your cap by Rs. {Math.abs(results.budgetGap).toLocaleString()}.
+        </ResultBox>
+      )}
+
+      <SectionTitle accent={ACCENT}>Allocation summary</SectionTitle>
+      <DataTable
+        columns={['Category', 'Monthly range', 'Source']}
+        rows={tableRows}
+        flexes={[1.5, 1.1, 1.6]}
+      />
+
+      <ReferenceStrip
+        title="Reference examples"
+        items={COST_REFERENCE}
+        accent={ACCENT}
+      />
     </ScrollView>
   );
 }
@@ -229,61 +285,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: {
-    padding: 26,
+    paddingHorizontal: 18,
+    paddingTop: 18,
   },
   intro: {
     fontSize: 13.5,
     color: '#6b7178',
-    lineHeight: 22,
-    marginBottom: 16,
+    lineHeight: 21,
+    marginBottom: 14,
   },
-  grid3: {
+  metrics: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
+    gap: 10,
   },
-  note: {
-    fontSize: 12,
-    color: '#6b7178',
-    lineHeight: 20,
-    marginBottom: 8,
-    paddingLeft: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: '#e6e0d0',
-  },
-  dualRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  dualLabel: {
+  autoSuggest: {
+    marginTop: 6,
     fontSize: 13,
-    color: '#6b7178',
-    minWidth: 60,
-  },
-  dualInputs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  dualInput: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    fontSize: 12,
     fontWeight: '700',
-    backgroundColor: 'rgba(47,143,131,0.08)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    textAlign: 'right',
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  dualSep: {
-    color: '#6b7178',
-    fontSize: 12,
+    color: ACCENT,
   },
 });

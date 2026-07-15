@@ -1,288 +1,184 @@
-import React, { useState, useMemo } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet, Dimensions,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Line, Circle, Text as SvgText, Polyline, G, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { TUITION_RATE, ENROLMENT_CAPACITY } from '../constants/modelData';
+import { ENROLMENT_CAPACITY, TUITION_RATE } from '../constants/modelData';
 import MetricCard from '../components/MetricCard';
 import SliderRow from '../components/SliderRow';
 import { SectionTitle } from '../components/ResultBox';
+import ResultBox from '../components/ResultBox';
 import EquationBox from '../components/EquationBox';
+import InfoBox from '../components/InfoBox';
+import { StackedBar } from '../components/GaugeBar';
+
+const { calculateBreakEven } = require('../utils/calculations');
 
 const ACCENT = COLORS.accentBE;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-const safeNum = (n, fallback = 0) =>
-  typeof n === 'number' && isFinite(n) && !isNaN(n) ? n : fallback;
-
 export default function BEScreen() {
   const insets = useSafeAreaInsets();
-  const [fixedCost, setFixedCost] = useState(12500);
-  const [varCostPerChild, setVarCostPerChild] = useState(1200);
+  const [fixedCost, setFixedCost] = useState(215000);
+  const [variableCostPerChild, setVariableCostPerChild] = useState(9800);
   const [tuition, setTuition] = useState(TUITION_RATE);
 
-  const results = useMemo(() => {
-    const contributionMargin = tuition - varCostPerChild;
-    const breakevenUnits = contributionMargin > 0
-      ? Math.ceil(fixedCost / contributionMargin)
-      : Infinity;
-    const breakevenRevenue = breakevenUnits === Infinity ? Infinity : breakevenUnits * tuition;
+  const results = useMemo(() => calculateBreakEven({
+    fixedCost,
+    variableCostPerChild,
+    tuition,
+    capacity: ENROLMENT_CAPACITY,
+  }), [fixedCost, tuition, variableCostPerChild]);
 
-    // Generate chart data
-    const chartData = [];
-    const maxX = Math.max(ENROLMENT_CAPACITY, breakevenUnits + 10);
-    const steps = 20;
-    const stepSize = maxX / steps;
-    let foundBE = false;
-
-    for (let i = 0; i <= steps; i++) {
-      const x = Math.round(i * stepSize);
-      const revenue = x * tuition;
-      const totalCost = fixedCost + x * varCostPerChild;
-      if (!foundBE && revenue >= totalCost && x > 0) {
-        foundBE = true;
-      }
-      chartData.push({ x, revenue, totalCost });
-    }
-
-    // P&L at breakeven
-    const plAtEnrolment = (enrol) => ({
-      revenue: enrol * tuition,
-      costs: fixedCost + enrol * varCostPerChild,
-      profit: enrol * tuition - (fixedCost + enrol * varCostPerChild),
+  const pl30 = 30 * tuition - (fixedCost + 30 * variableCostPerChild);
+  const maxX = Math.min(Math.max(ENROLMENT_CAPACITY, Number.isFinite(results.breakevenUnits) ? results.breakevenUnits + 10 : ENROLMENT_CAPACITY), 120);
+  const points = [];
+  for (let childCount = 0; childCount <= maxX; childCount += 5) {
+    points.push({
+      x: childCount,
+      revenue: childCount * tuition,
+      totalCost: fixedCost + childCount * variableCostPerChild,
     });
+  }
 
-    return {
-      contributionMargin,
-      breakevenUnits,
-      breakevenRevenue,
-      chartData,
-      maxX,
-      plAtEnrolment,
-    };
-  }, [fixedCost, varCostPerChild, tuition]);
-
-  // Chart dimensions
-  const chartW = Math.min(SCREEN_WIDTH - 76, 400);
+  const chartW = Math.min(SCREEN_WIDTH - 68, 420);
   const chartH = 240;
-  const pad = { top: 20, right: 10, bottom: 30, left: 50 };
+  const pad = { top: 20, right: 12, bottom: 32, left: 52 };
   const plotW = chartW - pad.left - pad.right;
   const plotH = chartH - pad.top - pad.bottom;
+  const maxVal = Math.max(...points.map((point) => Math.max(point.revenue, point.totalCost)), 1);
+  const toX = (value) => pad.left + (value / maxX) * plotW;
+  const toY = (value) => pad.top + plotH - (value / maxVal) * plotH;
 
-  const maxVal = Math.max(
-    ...results.chartData.map((d) => Math.max(safeNum(d.revenue), safeNum(d.totalCost))),
-    safeNum(results.breakevenRevenue, 0),
-    1
-  );
-
-  const toX = (x) => {
-    const px = pad.left + (x / (results.maxX || 1)) * plotW;
-    return safeNum(px, pad.left);
-  };
-  const toY = (v) => {
-    const py = pad.top + plotH - (safeNum(v) / maxVal) * plotH;
-    return safeNum(py, pad.top + plotH);
-  };
-
-  const revPoints = results.chartData.map((d) => `${toX(d.x)},${toY(d.revenue)}`).join(' ');
-  const costPoints = results.chartData.map((d) => `${toX(d.x)},${toY(d.totalCost)}`).join(' ');
-
-  const beX = results.breakevenUnits !== Infinity ? toX(results.breakevenUnits) : null;
-  const beY = results.breakevenRevenue !== Infinity ? toY(results.breakevenRevenue) : null;
-
-  // Breakeven assessment
-  const pl50 = results.plAtEnrolment(50);
+  const revenuePoints = points.map((point) => `${toX(point.x)},${toY(point.revenue)}`).join(' ');
+  const costPoints = points.map((point) => `${toX(point.x)},${toY(point.totalCost)}`).join(' ');
+  const beX = Number.isFinite(results.breakevenUnits) ? toX(results.breakevenUnits) : null;
+  const beY = Number.isFinite(results.breakevenRevenue) ? toY(results.breakevenRevenue) : null;
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 26 }]}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.intro}>
-        Calculate how many enrolled children you need to cover all costs.
-        Adjust fixed costs, variable costs per child, and tuition fees below.
+        Break-even converts the cost model into a simple question: how many enrolled children do you need
+        before revenue covers both the monthly fixed base and the variable cost of each child served.
       </Text>
 
-      {/* Metrics */}
-      <View style={styles.grid4}>
-        <MetricCard
-          label="Break-Even"
-          value={results.breakevenUnits === Infinity ? '—' : `${results.breakevenUnits} children`}
-          accent={ACCENT}
-        />
-        <MetricCard
-          label="BE Revenue"
-          value={results.breakevenRevenue === Infinity ? '—' : `Rs. ${results.breakevenRevenue.toLocaleString()}`}
-          accent={ACCENT}
-        />
-        <MetricCard
-          label="Contribution"
-          value={`Rs. ${results.contributionMargin}`}
-          subtitle="per child"
-          accent={ACCENT}
-        />
-        <MetricCard
-          label="P&L @ 50"
-          value={`Rs. ${pl50.profit.toLocaleString()}`}
-          subtitle={pl50.profit >= 0 ? 'Profit' : 'Loss'}
-          accent={pl50.profit >= 0 ? ACCENT : COLORS.accentRed}
-        />
+      <View style={styles.metrics}>
+        <MetricCard label="Break-even" value={Number.isFinite(results.breakevenUnits) ? `${results.breakevenUnits} children` : 'Not reachable'} accent={ACCENT} />
+        <MetricCard label="BE revenue" value={Number.isFinite(results.breakevenRevenue) ? `Rs. ${results.breakevenRevenue.toLocaleString()}` : '-'} accent={ACCENT} />
+        <MetricCard label="Contribution" value={`Rs. ${results.contributionMargin.toLocaleString()}`} subtitle="per child per month" accent={ACCENT} />
+        <MetricCard label="P/L at 30" value={`Rs. ${pl30.toLocaleString()}`} subtitle={pl30 >= 0 ? 'profit before depreciation' : 'loss before depreciation'} accent={pl30 >= 0 ? ACCENT : COLORS.accentRed} />
       </View>
 
-      {/* Inputs */}
-      <SectionTitle accent={ACCENT}>Key Assumptions</SectionTitle>
+      <InfoBox
+        title="Variables to determine"
+        accent={ACCENT}
+        items={[
+          { label: 'Fixed cost total:', text: 'Use the monthly floor from the cost model after staffing, rent, utilities, and marketing.' },
+          { label: 'Variable cost per child:', text: 'Bundle food, supplies, activity materials, and maintenance into one child-level contribution.' },
+          { label: 'Fee per child:', text: 'Use the actual monthly tuition plus any recurring add-on charge you expect to collect.' },
+        ]}
+      />
+
+      <SectionTitle accent={ACCENT}>Core assumptions</SectionTitle>
       <EquationBox accent={ACCENT}>
-        BE (units) = Fixed Costs / (Tuition − Variable Cost per Child)
+        Break-even children = fixed cost / (fee per child - variable cost per child)
       </EquationBox>
 
       <SliderRow
-        label="Fixed Costs"
-        unit="Rs./mo"
+        label="Fixed monthly cost"
+        unit="Rs."
         value={fixedCost}
         onChange={setFixedCost}
-        min={3000}
-        max={35000}
-        step={500}
+        min={100000}
+        max={700000}
+        step={5000}
         accent={ACCENT}
-        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
+        formatValue={(value) => `Rs. ${value.toLocaleString()}`}
       />
 
       <SliderRow
-        label="Variable Cost / Child"
-        unit="Rs./mo"
-        value={varCostPerChild}
-        onChange={setVarCostPerChild}
-        min={300}
-        max={2500}
-        step={50}
+        label="Variable cost per child"
+        unit="Rs."
+        value={variableCostPerChild}
+        onChange={setVariableCostPerChild}
+        min={2000}
+        max={20000}
+        step={250}
         accent={ACCENT}
-        formatValue={(v) => `Rs. ${v}`}
+        formatValue={(value) => `Rs. ${value.toLocaleString()}`}
       />
 
       <SliderRow
-        label="Tuition Fee"
-        unit="Rs./mo"
+        label="Monthly fee per child"
+        unit="Rs."
         value={tuition}
         onChange={setTuition}
-        min={500}
-        max={2000}
-        step={25}
+        min={15000}
+        max={70000}
+        step={500}
         accent={ACCENT}
-        formatValue={(v) => `Rs. ${v}`}
+        formatValue={(value) => `Rs. ${value.toLocaleString()}`}
       />
 
-      {/* Chart */}
-      <SectionTitle accent={ACCENT}>Break-Even Chart</SectionTitle>
+      <SectionTitle accent={ACCENT}>Cost composition</SectionTitle>
+      <StackedBar
+        segments={[fixedCost, variableCostPerChild]}
+        colors={[ACCENT, '#c0574f']}
+        labels={[
+          `Fixed monthly base: Rs. ${fixedCost.toLocaleString()}`,
+          `Variable per child: Rs. ${variableCostPerChild.toLocaleString()}`,
+        ]}
+      />
+
+      {Number.isFinite(results.breakevenUnits) && results.breakevenUnits <= ENROLMENT_CAPACITY ? (
+        <ResultBox type="ok">
+          Break-even occurs at {results.breakevenUnits} children. At that point revenue and total operating
+          cost intersect before depreciation and capital recovery are considered.
+        </ResultBox>
+      ) : (
+        <ResultBox type="warn">
+          Break-even exceeds the current capacity planning range. Reduce fixed costs, reduce variable cost
+          per child, or increase tuition before opening.
+        </ResultBox>
+      )}
+
+      <SectionTitle accent={ACCENT}>Break-even chart</SectionTitle>
       <View style={styles.chartContainer}>
         <Svg width={chartW} height={chartH}>
-          {/* Y-axis label */}
-          <SvgText x={8} y={12} fontSize={9} fill="#6b7178" textAnchor="start">
-            Rs.
-          </SvgText>
-
-          {/* Grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((r) => (
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
             <Line
-              key={r}
+              key={ratio}
               x1={pad.left}
-              y1={pad.top + plotH * (1 - r)}
+              y1={pad.top + plotH * (1 - ratio)}
               x2={chartW - pad.right}
-              y2={pad.top + plotH * (1 - r)}
+              y2={pad.top + plotH * (1 - ratio)}
               stroke="#eee9dc"
               strokeWidth={1}
               strokeDasharray="4,4"
             />
           ))}
+          <Polyline points={revenuePoints} fill="none" stroke={ACCENT} strokeWidth={2.5} />
+          <Polyline points={costPoints} fill="none" stroke={COLORS.accentRed} strokeWidth={2.5} />
 
-          {/* Revenue line */}
-          <Polyline
-            points={revPoints}
-            fill="none"
-            stroke={COLORS.accentLP}
-            strokeWidth={2.5}
-          />
-
-          {/* Cost line */}
-          <Polyline
-            points={costPoints}
-            fill="none"
-            stroke={COLORS.accentRed}
-            strokeWidth={2.5}
-          />
-
-          {/* Breakeven point */}
-          {beX !== null && beY !== null && (
+          {beX !== null && beY !== null ? (
             <>
-              <Line
-                x1={beX}
-                y1={pad.top + plotH}
-                x2={beX}
-                y2={beY}
-                stroke={ACCENT}
-                strokeWidth={1.5}
-                strokeDasharray="6,3"
-              />
-              <Line
-                x1={pad.left}
-                y1={beY}
-                x2={beX}
-                y2={beY}
-                stroke={ACCENT}
-                strokeWidth={1.5}
-                strokeDasharray="6,3"
-              />
+              <Line x1={beX} y1={pad.top + plotH} x2={beX} y2={beY} stroke={ACCENT} strokeDasharray="6,3" strokeWidth={1.5} />
               <Circle cx={beX} cy={beY} r={5} fill={ACCENT} stroke="#fff" strokeWidth={2} />
-              <SvgText
-                x={beX}
-                y={beY - 10}
-                fontSize={9}
-                fill={ACCENT}
-                fontWeight="700"
-                textAnchor="middle"
-              >
-                BE
-              </SvgText>
-              <SvgText
-                x={beX}
-                y={pad.top + plotH + 14}
-                fontSize={9}
-                fill={ACCENT}
-                fontWeight="600"
-                textAnchor="middle"
-              >
-                {results.breakevenUnits} children
-              </SvgText>
+              <SvgText x={beX} y={beY - 10} fontSize={9} fill={ACCENT} fontWeight="700" textAnchor="middle">BE</SvgText>
             </>
-          )}
+          ) : null}
 
-          {/* Legend */}
-          <G x={chartW - 130} y={8}>
-            <Rect x={0} y={0} width={10} height={3} rx={1.5} fill={COLORS.accentLP} />
+          <G x={chartW - 140} y={8}>
+            <Rect x={0} y={0} width={10} height={3} rx={1.5} fill={ACCENT} />
             <SvgText x={15} y={4} fontSize={9} fill="#6b7178">Revenue</SvgText>
-            <Rect x={65} y={0} width={10} height={3} rx={1.5} fill={COLORS.accentRed} />
-            <SvgText x={80} y={4} fontSize={9} fill="#6b7178">Total Cost</SvgText>
+            <Rect x={70} y={0} width={10} height={3} rx={1.5} fill={COLORS.accentRed} />
+            <SvgText x={85} y={4} fontSize={9} fill="#6b7178">Total cost</SvgText>
           </G>
         </Svg>
-      </View>
-
-      {/* P&L at key enrolment levels */}
-      <SectionTitle accent={ACCENT}>Profit & Loss at Key Levels</SectionTitle>
-      <View style={styles.grid3}>
-        {[30, 50, ENROLMENT_CAPACITY].map((n) => {
-          const pl = results.plAtEnrolment(n);
-          return (
-            <MetricCard
-              key={n}
-              label={`@ ${n} Children`}
-              value={`Rs. ${pl.profit.toLocaleString()}`}
-              subtitle={pl.profit >= 0 ? 'Profit' : 'Loss'}
-              accent={pl.profit >= 0 ? ACCENT : COLORS.accentRed}
-            />
-          );
-        })}
       </View>
     </ScrollView>
   );
@@ -294,31 +190,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: {
-    padding: 26,
+    paddingHorizontal: 18,
+    paddingTop: 18,
   },
   intro: {
     fontSize: 13.5,
     color: '#6b7178',
-    lineHeight: 22,
-    marginBottom: 16,
+    lineHeight: 21,
+    marginBottom: 14,
   },
-  grid3: {
+  metrics: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  grid4: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
+    gap: 10,
   },
   chartContainer: {
     backgroundColor: '#f6f2e8',
     borderRadius: 10,
     padding: 12,
-    marginTop: 8,
     alignItems: 'center',
   },
 });

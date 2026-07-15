@@ -1,190 +1,265 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet,
-} from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { AGE_GROUPS, MKT_CHANNELS, ROADMAP, TUITION_RATE, OPERATING_WEEKS } from '../constants/modelData';
+import {
+  AGE_GROUPS,
+  MKT_CHANNELS,
+  ROADMAP,
+  STAFFING_REFERENCE,
+  STAFF_ROLES,
+  TUITION_RATE,
+} from '../constants/modelData';
 import MetricCard from '../components/MetricCard';
 import SliderRow from '../components/SliderRow';
 import CheckRow from '../components/CheckRow';
-import { SectionTitle } from '../components/ResultBox';
+import ResultBox, { SectionTitle } from '../components/ResultBox';
 import EquationBox from '../components/EquationBox';
 import PhaseRoadmap from '../components/PhaseRoadmap';
 import { StackedBar } from '../components/GaugeBar';
+import InfoBox from '../components/InfoBox';
+import ConstraintList from '../components/ConstraintList';
+import DataTable from '../components/DataTable';
+import ReferenceStrip from '../components/ReferenceStrip';
+
+const { calculateStaffing } = require('../utils/calculations');
 
 const ACCENT = COLORS.accentLP;
 
 export default function LPScreen() {
   const insets = useSafeAreaInsets();
   const [children, setChildren] = useState({
-    infant: 4,
+    infant: 5,
     toddler: 8,
-    preschool: 12,
-    schoolage: 6,
+    preschool: 10,
+    schoolage: 7,
   });
+  const [budgetCap, setBudgetCap] = useState(420000);
+  const [roles, setRoles] = useState(STAFF_ROLES.map((role) => ({ ...role })));
+  const [channels, setChannels] = useState(MKT_CHANNELS.map((channel) => ({ ...channel })));
 
-  const [channels, setChannels] = useState(
-    MKT_CHANNELS.map((c) => ({ ...c }))
-  );
-
-  const [budget, setBudget] = useState(22000);
-
-  const toggleChannel = useCallback((id) => {
-    setChannels((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c))
-    );
+  const updateSalary = useCallback((id, salary) => {
+    setRoles((current) => current.map((role) => (role.id === id ? { ...role, salary } : role)));
   }, []);
 
-  const updateChannelCost = useCallback((id, val) => {
-    setChannels((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, cost: val } : c))
-    );
+  const toggleChannel = useCallback((id) => {
+    setChannels((current) => current.map((channel) => (channel.id === id ? { ...channel, active: !channel.active } : channel)));
+  }, []);
+
+  const updateChannelCost = useCallback((id, cost) => {
+    setChannels((current) => current.map((channel) => (channel.id === id ? { ...channel, cost } : channel)));
   }, []);
 
   const results = useMemo(() => {
-    let totalChildren = 0;
-    const staffByGroup = AGE_GROUPS.map((g) => {
-      const count = children[g.id] || 0;
-      totalChildren += count;
-      const staffNeeded = Math.ceil(count / g.ratio);
-      const staffCost = staffNeeded * g.rate * OPERATING_WEEKS;
-      return { ...g, count, staffNeeded, staffCost };
+    const staffingBase = calculateStaffing({
+      children,
+      ageGroups: AGE_GROUPS,
+      staffRoles: [],
+      marketingChannels: channels,
+      budgetCap,
     });
 
-    const totalStaff = staffByGroup.reduce((s, g) => s + g.staffNeeded, 0);
-    const totalStaffCost = staffByGroup.reduce((s, g) => s + g.staffCost, 0);
+    const infantGroup = staffingBase.staffByGroup.find((group) => group.id === 'infant');
+    const toddlerGroup = staffingBase.staffByGroup.find((group) => group.id === 'toddler');
+    const preschoolGroup = staffingBase.staffByGroup.find((group) => group.id === 'preschool');
+    const schoolAgeGroup = staffingBase.staffByGroup.find((group) => group.id === 'schoolage');
+    const teacherCount = (preschoolGroup?.staffNeeded || 0) + (schoolAgeGroup?.staffNeeded || 0);
 
-    const activeChannels = channels.filter((c) => c.active);
-    const mktCost = activeChannels.reduce((s, c) => s + c.cost, 0);
-    const mktEnroll = activeChannels.reduce((s, c) => s + c.enrollments, 0);
+    const roleAllocations = roles.map((role) => {
+      let required = role.required;
+      if (role.id === 'teacher') required = teacherCount;
+      if (role.id === 'baby') required = infantGroup?.staffNeeded || 0;
+      if (role.id === 'helper') required = toddlerGroup?.staffNeeded || 0;
+      const monthlyCost = required * role.salary;
+      return { ...role, required, monthlyCost };
+    });
 
-    const totalCost = totalStaffCost + mktCost;
-    const projectedRevenue = totalChildren * TUITION_RATE;
+    const totalStaff = roleAllocations.reduce((sum, role) => sum + role.required, 0);
+    const totalStaffCost = roleAllocations.reduce((sum, role) => sum + role.monthlyCost, 0);
+    const marketingCost = channels.filter((channel) => channel.active).reduce((sum, channel) => sum + channel.cost, 0);
+    const projectedRevenue = staffingBase.totalChildren * TUITION_RATE;
+    const totalCost = totalStaffCost + marketingCost;
 
     return {
-      totalChildren,
-      staffByGroup,
+      ...staffingBase,
+      roleAllocations,
       totalStaff,
       totalStaffCost,
-      mktCost,
-      mktEnroll,
+      marketingCost,
       totalCost,
       projectedRevenue,
-      overBudget: totalCost > budget,
+      budgetGap: budgetCap - totalCost,
+      overBudget: totalCost > budgetCap,
     };
-  }, [children, channels, budget]);
+  }, [budgetCap, channels, children, roles]);
+
+  const constraints = useMemo(() => ([
+    {
+      label: `Infant ratio 1:3 -> need at least ${Math.ceil((children.infant || 0) / 3)} caretaker(s)`,
+      ok: (results.roleAllocations.find((role) => role.id === 'baby')?.required || 0) >= Math.ceil((children.infant || 0) / 3),
+    },
+    {
+      label: `Toddler ratio 1:5 -> need at least ${Math.ceil((children.toddler || 0) / 5)} helper(s)`,
+      ok: (results.roleAllocations.find((role) => role.id === 'helper')?.required || 0) >= Math.ceil((children.toddler || 0) / 5),
+    },
+    {
+      label: `Pre-school ratio 1:8 and school-age ratio 1:12 are covered by shared teacher allocation`,
+      ok: true,
+    },
+    {
+      label: `Budget cap Rs. ${budgetCap.toLocaleString()} vs total staffing + marketing Rs. ${results.totalCost.toLocaleString()}`,
+      ok: !results.overBudget,
+    },
+  ]), [budgetCap, children.infant, children.toddler, results.overBudget, results.roleAllocations, results.totalCost]);
+
+  const roleRows = results.roleAllocations.map((role) => ([
+    role.label,
+    String(role.required),
+    `Rs. ${role.salary.toLocaleString()}`,
+    `Rs. ${role.monthlyCost.toLocaleString()}`,
+  ]));
+
+  roleRows.push([
+    'Total',
+    String(results.totalStaff),
+    '',
+    `Rs. ${results.totalStaffCost.toLocaleString()}`,
+  ]);
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 26 }]}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.intro}>
-        Optimise staffing levels based on child-to-carer ratios, enrolment numbers,
-        and marketing channels. Adjust the parameters below to see the optimal staffing plan.
+        This model finds the minimum practical staffing plan for your age mix, then checks whether the
+        planned salaries and marketing mix still fit your monthly launch budget.
       </Text>
 
-      {/* Metrics Grid */}
-      <View style={styles.grid3}>
-        <MetricCard label="Total Children" value={results.totalChildren} accent={ACCENT} />
-        <MetricCard label="Staff Needed" value={results.totalStaff} accent={ACCENT} />
-        <MetricCard label="Staff Cost" value={`Rs. ${results.totalStaffCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Budget" value={`Rs. ${budget.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Marketing Cost" value={`Rs. ${results.mktCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Revenue" value={`Rs. ${results.projectedRevenue.toLocaleString()}`} accent={ACCENT} />
+      <View style={styles.metrics}>
+        <MetricCard label="Children" value={results.totalChildren} accent={ACCENT} />
+        <MetricCard label="Total staff" value={results.totalStaff} subtitle="all roles combined" accent={ACCENT} />
+        <MetricCard label="Staff cost" value={`Rs. ${results.totalStaffCost.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Projected revenue" value={`Rs. ${results.projectedRevenue.toLocaleString()}`} subtitle="tuition only" accent={ACCENT} />
       </View>
 
-      {/* Age Group Sliders */}
-      <SectionTitle accent={ACCENT}>Children by Age Group</SectionTitle>
+      <InfoBox
+        title="Variables to determine"
+        accent={ACCENT}
+        items={[
+          { label: 'Child mix:', text: 'Set expected infants, toddlers, pre-school, and school-age enrolment.' },
+          { label: 'Role salaries:', text: 'Replace the salary defaults with your actual hiring estimates.' },
+          { label: 'Marketing mix:', text: 'Enable only the channels you plan to run in the first months.' },
+          { label: 'Budget cap:', text: 'Use the monthly operating ceiling you can sustain before scale-up.' },
+        ]}
+      />
+
+      <SectionTitle accent={ACCENT}>How the staffing logic works</SectionTitle>
       <EquationBox accent={ACCENT}>
-        Staff needed = ceil(children / ratio)  |  Staff cost = staff × rate × 48 weeks
+        Required staff = ceil(children / ratio)
+        {'\n'}
+        Total staffing cost = sum(role count x monthly salary)
       </EquationBox>
 
-      {AGE_GROUPS.map((g) => (
+      {AGE_GROUPS.map((group) => (
         <SliderRow
-          key={g.id}
-          label={g.label}
+          key={group.id}
+          label={group.label}
           unit="children"
-          value={children[g.id]}
-          onChange={(v) => setChildren((prev) => ({ ...prev, [g.id]: v }))}
+          value={children[group.id]}
+          onChange={(value) => setChildren((current) => ({ ...current, [group.id]: value }))}
           min={0}
-          max={20}
+          max={40}
           step={1}
-          accent={ACCENT}
-          suffix=""
+          accent={group.color}
+          description={`Target ratio 1:${group.ratio}`}
         />
       ))}
 
-      {/* Staffing Summary */}
-      <View style={styles.grid2}>
-        {results.staffByGroup.map((g) => (
-          <MetricCard
-            key={g.id}
-            label={`${g.label.split('(')[0].trim()} Staff`}
-            value={`${g.staffNeeded} staff`}
-            subtitle={`Rs. ${g.staffCost.toLocaleString()}`}
-            accent={g.color}
-          />
-        ))}
-      </View>
+      <SectionTitle accent={ACCENT}>Role salaries</SectionTitle>
+      {roles.map((role) => (
+        <SliderRow
+          key={role.id}
+          label={role.label}
+          unit="Rs./mo"
+          value={role.salary}
+          onChange={(value) => updateSalary(role.id, value)}
+          min={15000}
+          max={80000}
+          step={1000}
+          accent={ACCENT}
+          description={role.note}
+          formatValue={(value) => `Rs. ${value.toLocaleString()}`}
+        />
+      ))}
 
-      {/* Marketing Channels */}
-      <SectionTitle accent={ACCENT}>Marketing Channels</SectionTitle>
-      {channels.map((c) => (
+      <SectionTitle accent={ACCENT}>Optimal staffing plan</SectionTitle>
+      <DataTable
+        columns={['Role', 'Qty', 'Salary', 'Monthly cost']}
+        rows={roleRows}
+        flexes={[2.4, 0.8, 1.2, 1.3]}
+      />
+
+      <SectionTitle accent={ACCENT}>Constraint check</SectionTitle>
+      <ConstraintList items={constraints} />
+
+      <SectionTitle accent={ACCENT}>Marketing channels</SectionTitle>
+      {channels.map((channel) => (
         <CheckRow
-          key={c.id}
-          label={`${c.label} (${c.enrollments} enrollments)`}
-          checked={c.active}
-          onToggle={() => toggleChannel(c.id)}
-          value={c.cost}
-          onChangeValue={(val) => updateChannelCost(c.id, val)}
+          key={channel.id}
+          label={`${channel.label} (${channel.enrollments} projected enrolments)`}
+          checked={channel.active}
+          onToggle={() => toggleChannel(channel.id)}
+          value={channel.cost}
+          onChangeValue={(value) => updateChannelCost(channel.id, value)}
           unit="Rs./mo"
           accent={ACCENT}
         />
       ))}
 
-      {/* Budget */}
       <SliderRow
-        label="Monthly Staff Budget"
+        label="Monthly operating budget cap"
         unit="Rs."
-        value={budget}
-        onChange={setBudget}
-        min={5000}
-        max={50000}
-        step={500}
+        value={budgetCap}
+        onChange={setBudgetCap}
+        min={150000}
+        max={900000}
+        step={10000}
         accent={ACCENT}
-        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
+        formatValue={(value) => `Rs. ${value.toLocaleString()}`}
       />
 
-      {/* Result */}
       {results.overBudget ? (
-        <View style={styles.resultWarn}>
-          <Text style={styles.warnText}>
-            ⚠ Total cost (${results.totalCost.toLocaleString()}) exceeds budget (${budget.toLocaleString()}) 
-            by ${(results.totalCost - budget).toLocaleString()}. Reduce staffing or marketing.
-          </Text>
-        </View>
+        <ResultBox type="warn">
+          Total staffing and marketing cost is Rs. {results.totalCost.toLocaleString()}, which exceeds the
+          cap by Rs. {Math.abs(results.budgetGap).toLocaleString()}. Reduce salaries, trim channels, or
+          lower the opening age mix.
+        </ResultBox>
       ) : (
-        <View style={styles.resultOk}>
-          <Text style={styles.okText}>
-            ✓ Total cost (${results.totalCost.toLocaleString()}) is within budget (${budget.toLocaleString()}).
-            Surplus: ${(budget - results.totalCost).toLocaleString()}
-          </Text>
-        </View>
+        <ResultBox type="ok">
+          Total staffing and marketing cost is Rs. {results.totalCost.toLocaleString()}, leaving
+          Rs. {results.budgetGap.toLocaleString()} of monthly slack before launch.
+        </ResultBox>
       )}
 
-      {/* Cost Breakdown */}
-      <SectionTitle accent={ACCENT}>Cost Breakdown</SectionTitle>
+      <SectionTitle accent={ACCENT}>Cost split</SectionTitle>
       <StackedBar
-        segments={[results.totalStaffCost, results.mktCost]}
-        colors={[ACCENT, '#a8c4e0']}
-        labels={[`Staff: Rs. ${results.totalStaffCost.toLocaleString()}`, `Marketing: Rs. ${results.mktCost.toLocaleString()}`]}
+        segments={[results.totalStaffCost, results.marketingCost]}
+        colors={[ACCENT, '#c0574f']}
+        labels={[
+          `Staffing: Rs. ${results.totalStaffCost.toLocaleString()}`,
+          `Marketing: Rs. ${results.marketingCost.toLocaleString()}`,
+        ]}
       />
 
-      {/* Roadmap */}
-      <SectionTitle accent={ACCENT}>Phase Roadmap</SectionTitle>
+      <ReferenceStrip
+        title="Reference examples"
+        items={STAFFING_REFERENCE}
+        accent={ACCENT}
+      />
+
+      <SectionTitle accent={ACCENT}>Phase roadmap</SectionTitle>
       <PhaseRoadmap phases={ROADMAP} accent={ACCENT} />
     </ScrollView>
   );
@@ -196,52 +271,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: {
-    padding: 26,
+    paddingHorizontal: 18,
+    paddingTop: 18,
   },
   intro: {
     fontSize: 13.5,
     color: '#6b7178',
-    lineHeight: 22,
-    marginBottom: 16,
+    lineHeight: 21,
+    marginBottom: 14,
   },
-  grid2: {
+  metrics: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  grid3: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  resultOk: {
-    backgroundColor: '#eaf6ee',
-    borderRadius: 10,
-    padding: 13,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    borderWidth: 1.5,
-    borderColor: '#bfe2ca',
-  },
-  resultWarn: {
-    backgroundColor: '#fdf3e2',
-    borderRadius: 10,
-    padding: 13,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    borderWidth: 1.5,
-    borderColor: '#f0dcae',
-  },
-  okText: {
-    color: '#2f7a4f',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  warnText: {
-    color: '#a06a12',
-    fontSize: 13,
-    lineHeight: 20,
+    gap: 10,
   },
 });
