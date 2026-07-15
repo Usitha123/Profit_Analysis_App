@@ -113,17 +113,17 @@ export default function COScreen() {
 
       {/* Metrics */}
       <View style={styles.grid3}>
-        <MetricCard label="Total Cost" value={`$${results.totalCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Revenue" value={`$${results.revenue.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Total Cost" value={`Rs. ${results.totalCost.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} />
         <MetricCard
           label="Surplus"
-          value={`$${results.surplus.toLocaleString()}`}
+          value={`Rs. ${results.surplus.toLocaleString()}`}
           accent={results.surplus >= 0 ? ACCENT : COLORS.accentRed}
           subtitle={results.surplus >= 0 ? 'Profitable' : 'Loss'}
         />
-        <MetricCard label="Cost / Child" value={`$${Math.round(results.costPerChild)}`} accent={ACCENT} />
-        <MetricCard label="Fixed Costs" value={`$${results.totalFixed.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Variable Costs" value={`$${results.totalVariable.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Cost / Child" value={`Rs. ${Math.round(results.costPerChild)}`} accent={ACCENT} />
+        <MetricCard label="Fixed Costs" value={`Rs. ${results.totalFixed.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Variable Costs" value={`Rs. ${results.totalVariable.toLocaleString()}`} accent={ACCENT} />
       </View>
 
       {/* Gauge */}
@@ -155,14 +155,14 @@ export default function COScreen() {
 
       <SliderRow
         label="Tuition Fee"
-        unit="$/mo"
+        unit="Rs./mo"
         value={tuition}
         onChange={setTuition}
         min={500}
         max={2000}
         step={25}
         accent={ACCENT}
-        formatValue={(v) => `$${v}`}
+        formatValue={(v) => `Rs. ${v}`}
       />
 
       <SliderRow
@@ -209,14 +209,14 @@ export default function COScreen() {
         <SliderRow
           key={c.id}
           label={c.label}
-          unit="$/mo"
+          unit="Rs./mo"
           value={c.value}
           onChange={(v) => updateFixedCost(c.id, v)}
           min={0}
           max={10000}
           step={50}
           accent={ACCENT}
-          formatValue={(v) => `$${v.toLocaleString()}`}
+          formatValue={(v) => `Rs. ${v.toLocaleString()}`}
         />
       ))}
     </ScrollView>

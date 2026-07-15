@@ -122,11 +122,11 @@ export default function PFScreen() {
 
       {/* Key Metrics */}
       <View style={styles.grid3}>
-        <MetricCard label="Monthly Revenue" value={`$${results.revenue.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="EBITDA" value={`$${Math.round(results.ebitda).toLocaleString()}`} accent={ACCENT} subtitle="Earnings before depreciation" />
-        <MetricCard label="Net Profit" value={`$${Math.round(results.netProfit).toLocaleString()}`} accent={results.netProfit >= 0 ? ACCENT : COLORS.accentRed} />
+        <MetricCard label="Monthly Revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="EBITDA" value={`Rs. ${Math.round(results.ebitda).toLocaleString()}`} accent={ACCENT} subtitle="Earnings before depreciation" />
+        <MetricCard label="Net Profit" value={`Rs. ${Math.round(results.netProfit).toLocaleString()}`} accent={results.netProfit >= 0 ? ACCENT : COLORS.accentRed} />
         <MetricCard label="Profit Margin" value={`${results.profitMargin.toFixed(1)}%`} accent={results.profitMargin >= 0 ? ACCENT : COLORS.accentRed} />
-        <MetricCard label="Total Investment" value={`$${results.totalInvestment.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Total Investment" value={`Rs. ${results.totalInvestment.toLocaleString()}`} accent={ACCENT} />
         <MetricCard label="Annual ROI" value={`${results.roi.toFixed(1)}%`} accent={results.roi >= 0 ? ACCENT : COLORS.accentRed} />
       </View>
 
@@ -150,26 +150,26 @@ export default function PFScreen() {
 
       <SliderRow
         label="Tuition Fee"
-        unit="$/mo"
+        unit="Rs./mo"
         value={tuition}
         onChange={setTuition}
         min={500}
         max={2000}
         step={25}
         accent={ACCENT}
-        formatValue={(v) => `$${v}`}
+        formatValue={(v) => `Rs. ${v}`}
       />
 
       <SliderRow
         label="Operating Costs"
-        unit="$/mo"
+        unit="Rs./mo"
         value={operatingCosts}
         onChange={setOperatingCosts}
         min={5000}
         max={50000}
         step={500}
         accent={ACCENT}
-        formatValue={(v) => `$${v.toLocaleString()}`}
+        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
       />
 
       {/* Capital Assets & Depreciation */}
@@ -208,7 +208,7 @@ export default function PFScreen() {
                 placeholderTextColor="#6b7178"
               />
               <Text style={styles.assetVal}>
-                ${Math.round(monthlyDep).toLocaleString()}
+                Rs. {Math.round(monthlyDep).toLocaleString()}
               </Text>
             </View>
           );
@@ -216,11 +216,11 @@ export default function PFScreen() {
         <View style={[styles.assetRow, styles.assetTotal]}>
           <Text style={[styles.assetCell, { flex: 2, fontWeight: '700' }]}>Total</Text>
           <Text style={styles.assetVal}>
-            ${assets.reduce((s, a) => s + (Number(a.cost) || 0), 0).toLocaleString()}
+            Rs. {assets.reduce((s, a) => s + (Number(a.cost) || 0), 0).toLocaleString()}
           </Text>
           <Text style={styles.assetVal}></Text>
           <Text style={[styles.assetVal, { fontWeight: '700' }]}>
-            ${Math.round(results.totalDepreciation).toLocaleString()}
+            Rs. {Math.round(results.totalDepreciation).toLocaleString()}
           </Text>
         </View>
       </View>
@@ -238,7 +238,7 @@ export default function PFScreen() {
       <View style={styles.chartContainer}>
         <Svg width={chartW} height={chartH}>
           <SvgText x={8} y={12} fontSize={9} fill="#6b7178" textAnchor="start">
-            $
+            Rs.
           </SvgText>
 
           {[0, 0.25, 0.5, 0.75, 1].map((r) => (
@@ -290,13 +290,13 @@ export default function PFScreen() {
         {results.projection.map((d) => (
           <View key={d.month} style={styles.tr}>
             <Text style={styles.td}>{d.month}</Text>
-            <Text style={styles.td}>${d.revenue.toLocaleString()}</Text>
-            <Text style={styles.td}>${d.costs.toLocaleString()}</Text>
+            <Text style={styles.td}>Rs. {d.revenue.toLocaleString()}</Text>
+            <Text style={styles.td}>Rs. {d.costs.toLocaleString()}</Text>
             <Text style={[styles.td, { color: d.ebitda >= 0 ? COLORS.textSuccess : COLORS.accentRed }]}>
-              ${d.ebitda.toLocaleString()}
+              Rs. {d.ebitda.toLocaleString()}
             </Text>
             <Text style={[styles.td, { color: d.net >= 0 ? COLORS.textSuccess : COLORS.accentRed }]}>
-              ${d.net.toLocaleString()}
+              Rs. {d.net.toLocaleString()}
             </Text>
           </View>
         ))}

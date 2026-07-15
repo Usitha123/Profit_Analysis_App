@@ -90,10 +90,10 @@ export default function LPScreen() {
       <View style={styles.grid3}>
         <MetricCard label="Total Children" value={results.totalChildren} accent={ACCENT} />
         <MetricCard label="Staff Needed" value={results.totalStaff} accent={ACCENT} />
-        <MetricCard label="Staff Cost" value={`$${results.totalStaffCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Budget" value={`$${budget.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Marketing Cost" value={`$${results.mktCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Revenue" value={`$${results.projectedRevenue.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Staff Cost" value={`Rs. ${results.totalStaffCost.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Budget" value={`Rs. ${budget.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Marketing Cost" value={`Rs. ${results.mktCost.toLocaleString()}`} accent={ACCENT} />
+        <MetricCard label="Revenue" value={`Rs. ${results.projectedRevenue.toLocaleString()}`} accent={ACCENT} />
       </View>
 
       {/* Age Group Sliders */}
@@ -124,7 +124,7 @@ export default function LPScreen() {
             key={g.id}
             label={`${g.label.split('(')[0].trim()} Staff`}
             value={`${g.staffNeeded} staff`}
-            subtitle={`$${g.staffCost.toLocaleString()}`}
+            subtitle={`Rs. ${g.staffCost.toLocaleString()}`}
             accent={g.color}
           />
         ))}
@@ -140,7 +140,7 @@ export default function LPScreen() {
           onToggle={() => toggleChannel(c.id)}
           value={c.cost}
           onChangeValue={(val) => updateChannelCost(c.id, val)}
-          unit="$/mo"
+          unit="Rs./mo"
           accent={ACCENT}
         />
       ))}
@@ -148,14 +148,14 @@ export default function LPScreen() {
       {/* Budget */}
       <SliderRow
         label="Monthly Staff Budget"
-        unit="$"
+        unit="Rs."
         value={budget}
         onChange={setBudget}
         min={5000}
         max={50000}
         step={500}
         accent={ACCENT}
-        formatValue={(v) => `$${v.toLocaleString()}`}
+        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
       />
 
       {/* Result */}
@@ -180,7 +180,7 @@ export default function LPScreen() {
       <StackedBar
         segments={[results.totalStaffCost, results.mktCost]}
         colors={[ACCENT, '#a8c4e0']}
-        labels={[`Staff: $${results.totalStaffCost.toLocaleString()}`, `Marketing: $${results.mktCost.toLocaleString()}`]}
+        labels={[`Staff: Rs. ${results.totalStaffCost.toLocaleString()}`, `Marketing: Rs. ${results.mktCost.toLocaleString()}`]}
       />
 
       {/* Roadmap */}

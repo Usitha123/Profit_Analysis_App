@@ -115,18 +115,18 @@ export default function BEScreen() {
         />
         <MetricCard
           label="BE Revenue"
-          value={results.breakevenRevenue === Infinity ? '—' : `$${results.breakevenRevenue.toLocaleString()}`}
+          value={results.breakevenRevenue === Infinity ? '—' : `Rs. ${results.breakevenRevenue.toLocaleString()}`}
           accent={ACCENT}
         />
         <MetricCard
           label="Contribution"
-          value={`$${results.contributionMargin}`}
+          value={`Rs. ${results.contributionMargin}`}
           subtitle="per child"
           accent={ACCENT}
         />
         <MetricCard
           label="P&L @ 50"
-          value={`$${pl50.profit.toLocaleString()}`}
+          value={`Rs. ${pl50.profit.toLocaleString()}`}
           subtitle={pl50.profit >= 0 ? 'Profit' : 'Loss'}
           accent={pl50.profit >= 0 ? ACCENT : COLORS.accentRed}
         />
@@ -140,38 +140,38 @@ export default function BEScreen() {
 
       <SliderRow
         label="Fixed Costs"
-        unit="$/mo"
+        unit="Rs./mo"
         value={fixedCost}
         onChange={setFixedCost}
         min={3000}
         max={35000}
         step={500}
         accent={ACCENT}
-        formatValue={(v) => `$${v.toLocaleString()}`}
+        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
       />
 
       <SliderRow
         label="Variable Cost / Child"
-        unit="$/mo"
+        unit="Rs./mo"
         value={varCostPerChild}
         onChange={setVarCostPerChild}
         min={300}
         max={2500}
         step={50}
         accent={ACCENT}
-        formatValue={(v) => `$${v}`}
+        formatValue={(v) => `Rs. ${v}`}
       />
 
       <SliderRow
         label="Tuition Fee"
-        unit="$/mo"
+        unit="Rs./mo"
         value={tuition}
         onChange={setTuition}
         min={500}
         max={2000}
         step={25}
         accent={ACCENT}
-        formatValue={(v) => `$${v}`}
+        formatValue={(v) => `Rs. ${v}`}
       />
 
       {/* Chart */}
@@ -180,7 +180,7 @@ export default function BEScreen() {
         <Svg width={chartW} height={chartH}>
           {/* Y-axis label */}
           <SvgText x={8} y={12} fontSize={9} fill="#6b7178" textAnchor="start">
-            $
+            Rs.
           </SvgText>
 
           {/* Grid lines */}
@@ -277,7 +277,7 @@ export default function BEScreen() {
             <MetricCard
               key={n}
               label={`@ ${n} Children`}
-              value={`$${pl.profit.toLocaleString()}`}
+              value={`Rs. ${pl.profit.toLocaleString()}`}
               subtitle={pl.profit >= 0 ? 'Profit' : 'Loss'}
               accent={pl.profit >= 0 ? ACCENT : COLORS.accentRed}
             />
