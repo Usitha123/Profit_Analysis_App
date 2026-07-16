@@ -36,9 +36,9 @@ Loaded modules:
 7FFBEFC60000 ole32.dll
 7FFBC7230000 explorer-details-better-file-sizes_1.5.1_828042.dll
 7FFBEF3C0000 OLEAUT32.dll
-7FFBE7D80000 PROPSYS.dll
-7FFBC6F10000 libc++.whl
 7FFBC6ED0000 libunwind.whl
+7FFBC6F10000 libc++.whl
+7FFBE7D80000 PROPSYS.dll
 7FFBC6AC0000 winui-context-menu-animation_1.0.1_181837.dll
 7FFBE0260000 COMCTL32.dll
 7FFBDC6B0000 MSIMG32.dll
