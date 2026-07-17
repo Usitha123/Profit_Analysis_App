@@ -9,9 +9,10 @@ export default function CheckRow({
   onChangeValue,
   unit,
   accent = '#3d6ea5',
+  plain = false,
 }) {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, plain && styles.rowPlain]}>
       <View style={styles.head}>
         <Switch
           value={checked}
@@ -45,6 +46,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     minHeight: 44,
     justifyContent: 'center',
+  },
+  rowPlain: {
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    marginBottom: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eef0f3',
   },
   head: {
     flexDirection: 'row',

@@ -71,9 +71,9 @@ export const getAccent = (tabId) => {
 export const getTint = (tabId) => ACCENT_TINTS[tabId] || ACCENT_TINTS.lp;
 
 export const TAB_CONFIG = [
-  { id: 'lp', label: 'Staffing', accent: COLORS.accentLP, tint: ACCENT_TINTS.lp },
-  { id: 'co', label: 'Cost', accent: COLORS.accentCO, tint: ACCENT_TINTS.co },
-  { id: 'be', label: 'Break-Even', accent: COLORS.accentBE, tint: ACCENT_TINTS.be },
-  { id: 'gr', label: 'Growth', accent: COLORS.accentGR, tint: ACCENT_TINTS.gr },
-  { id: 'pf', label: 'Profit', accent: COLORS.accentPF, tint: ACCENT_TINTS.pf },
+  { id: 'lp', label: 'Staffing',   heading: 'Staff optimisation', subtitle: 'Staffing decision model',   accent: COLORS.accentLP, tint: ACCENT_TINTS.lp },
+  { id: 'co', label: 'Cost',       heading: 'Cost allocation',    subtitle: 'Cost decision model',       accent: COLORS.accentCO, tint: ACCENT_TINTS.co },
+  { id: 'be', label: 'Break-Even', heading: 'Break-even point',   subtitle: 'Break-even decision model', accent: COLORS.accentBE, tint: ACCENT_TINTS.be },
+  { id: 'gr', label: 'Growth',     heading: 'Growth projection',  subtitle: 'Growth decision model',     accent: COLORS.accentGR, tint: ACCENT_TINTS.gr },
+  { id: 'pf', label: 'Profit',     heading: 'Profit and ROI',     subtitle: 'Profit decision model',     accent: COLORS.accentPF, tint: ACCENT_TINTS.pf },
 ];

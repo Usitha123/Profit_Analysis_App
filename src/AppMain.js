@@ -1,5 +1,7 @@
+import 'react-native-gesture-handler';
 import React, { useState } from 'react';
 import { StatusBar } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { TAB_CONFIG } from './constants/theme';
 import { PlannerProvider } from './context/PlannerContext';
@@ -26,22 +28,23 @@ export default function AppMain() {
   const currentTab = TAB_CONFIG.find((tab) => tab.id === activeTab);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" />
-      <PlannerProvider>
-        {started ? (
-          <AppShell
-            activeTab={activeTab}
-            onChangeTab={setActiveTab}
-            title="Daycare Centre"
-            subtitle={currentTab ? `${currentTab.label} decision model` : 'Mathematical decision models'}
-          >
-            <ActiveScreen />
-          </AppShell>
-        ) : (
-          <WelcomeScreen onStart={() => setStarted(true)} />
-        )}
-      </PlannerProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" />
+        <PlannerProvider>
+          {started ? (
+            <AppShell
+              activeTab={activeTab}
+              onChangeTab={setActiveTab}
+              title="Daycare Center"
+            >
+              <ActiveScreen />
+            </AppShell>
+          ) : (
+            <WelcomeScreen onStart={() => setStarted(true)} />
+          )}
+        </PlannerProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

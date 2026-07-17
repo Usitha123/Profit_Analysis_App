@@ -21,10 +21,16 @@ export default function ResultBox({ type, children }) {
   );
 }
 
-export function SectionTitle({ children, accent = COLORS.accentLP }) {
+export function SectionTitle({ children, accent = COLORS.accentLP, icon }) {
   return (
     <View style={styles.sectionTitle}>
-      <View style={[styles.sectionDot, { backgroundColor: accent }]} />
+      {icon ? (
+        <View style={[styles.sectionIcon, { backgroundColor: `${accent}18` }]}>
+          <MaterialCommunityIcons name={icon} size={14} color={accent} />
+        </View>
+      ) : (
+        <View style={[styles.sectionDot, { backgroundColor: accent }]} />
+      )}
       <Text style={styles.sectionText}>{children}</Text>
     </View>
   );
@@ -52,14 +58,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 22,
-    marginBottom: 10,
+    marginTop: 26,
+    marginBottom: 12,
   },
   sectionDot: { width: 7, height: 7, borderRadius: 3.5 },
+  sectionIcon: {
+    width: 22, height: 22, borderRadius: 7,
+    alignItems: 'center', justifyContent: 'center',
+  },
   sectionText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.textPrimary,
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
 });

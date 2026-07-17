@@ -1,26 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { COLORS } from '../constants/theme';
 import {
-  CO_AGE_MIX,
-  ENROLMENT_CAPACITY,
-  FIXED_COST_RANGES,
-  PER_CHILD_COST_RANGES,
-  STAFF_ROLES,
+  CO_AGE_MIX, FIXED_COST_RANGES, PER_CHILD_COST_RANGES, STAFF_ROLES,
 } from '../constants/modelData';
+import { usePlanner } from '../context/PlannerContext';
 import MetricCard from '../components/MetricCard';
 import SliderRow, { DualSlider } from '../components/SliderRow';
-import { SectionTitle } from '../components/ResultBox';
 import ResultBox from '../components/ResultBox';
+import Section from '../components/Section';
 import DataTable from '../components/DataTable';
 import GaugeBar from '../components/GaugeBar';
 
 const ACCENT = COLORS.accentCO;
-
-function scaleRanges(base, factor) {
-  return base.map((item) => ({ ...item, min: Math.round(item.min * factor), max: Math.round(item.max * factor) }));
-}
 
 function staffFloorForEnrolment(n) {
   const infant = Math.round(n * CO_AGE_MIX.infant);
@@ -39,13 +33,31 @@ function staffFloorForEnrolment(n) {
   }, 0);
 }
 
+function scaleRanges(base, factor) {
+  return base.map((item) => ({ ...item, min: Math.round(item.min * factor), max: Math.round(item.max * factor) }));
+}
+
 export default function COScreen() {
   const insets = useSafeAreaInsets();
-  const [enrolment, setEnrolment] = useState(28);
-  const [budgetCap, setBudgetCap] = useState(450000);
-  const [fixedRanges, setFixedRanges] = useState(FIXED_COST_RANGES);
-  const [perChildRanges, setPerChildRanges] = useState(PER_CHILD_COST_RANGES);
+  const planner = usePlanner();
   const [autoNote, setAutoNote] = useState(null);
+
+  const enrolment = Math.max(10, planner.totalChildren || 10);
+
+  const fixedRanges = useMemo(
+    () => FIXED_COST_RANGES.map((meta) => {
+      const saved = (planner.coFixedRanges || []).find((r) => r.id === meta.id);
+      return { ...meta, min: saved?.min ?? meta.min, max: saved?.max ?? meta.max };
+    }),
+    [planner.coFixedRanges],
+  );
+  const perChildRanges = useMemo(
+    () => PER_CHILD_COST_RANGES.map((meta) => {
+      const saved = (planner.coPerChildRanges || []).find((r) => r.id === meta.id);
+      return { ...meta, min: saved?.min ?? meta.min, max: saved?.max ?? meta.max };
+    }),
+    [planner.coPerChildRanges],
+  );
 
   const staffFloor = useMemo(() => staffFloorForEnrolment(enrolment), [enrolment]);
 
@@ -57,20 +69,30 @@ export default function COScreen() {
     const totalMin = fixedMin + staffFloor + pcMin * enrolment;
     const totalMax = fixedMax + staffFloor + pcMax * enrolment;
     return {
-      totalMin, totalMax,
-      perChildMin: pcMin, perChildMax: pcMax,
-      feasible: totalMin <= budgetCap,
-      budgetGap: budgetCap - totalMin,
+      totalMin, totalMax, perChildMin: pcMin, perChildMax: pcMax,
+      feasible: totalMin <= planner.coBudgetCap,
+      budgetGap: planner.coBudgetCap - totalMin,
     };
-  }, [budgetCap, enrolment, fixedRanges, perChildRanges, staffFloor]);
+  }, [planner.coBudgetCap, enrolment, fixedRanges, perChildRanges, staffFloor]);
 
-  const updateFixed = (id, lo, hi) => setFixedRanges((cur) => cur.map((i) => i.id === id ? { ...i, min: lo, max: hi } : i));
-  const updatePerChild = (id, lo, hi) => setPerChildRanges((cur) => cur.map((i) => i.id === id ? { ...i, min: lo, max: hi } : i));
+  const updateFixed = (id, lo, hi) => {
+    const next = fixedRanges.map((i) => (i.id === id ? { ...i, min: lo, max: hi } : i))
+      .map(({ id, min, max }) => ({ id, min, max }));
+    planner.update({ coFixedRanges: next });
+  };
+  const updatePerChild = (id, lo, hi) => {
+    const next = perChildRanges.map((i) => (i.id === id ? { ...i, min: lo, max: hi } : i))
+      .map(({ id, min, max }) => ({ id, min, max }));
+    planner.update({ coPerChildRanges: next });
+  };
 
   const autoSuggest = () => {
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
     const sizeFactor = Math.max(0.5, enrolment / 28);
-    setFixedRanges(scaleRanges(FIXED_COST_RANGES, sizeFactor));
-    setPerChildRanges(PER_CHILD_COST_RANGES);
+    planner.update({
+      coFixedRanges: scaleRanges(FIXED_COST_RANGES, sizeFactor).map(({ id, min, max }) => ({ id, min, max })),
+      coPerChildRanges: PER_CHILD_COST_RANGES.map(({ id, min, max }) => ({ id, min, max })),
+    });
     setAutoNote(`Scaled ranges for n=${enrolment} using survey baseline at n=28.`);
   };
 
@@ -80,7 +102,7 @@ export default function COScreen() {
     ...perChildRanges.map((i) => [
       i.label,
       `Rs. ${(i.min * enrolment).toLocaleString()} - ${(i.max * enrolment).toLocaleString()}`,
-      `Rs. ${i.min}-${i.max}/child x ${enrolment}`,
+      `Rs. ${i.min}-${i.max}/child × ${enrolment}`,
     ]),
     ['Minimum feasible C*', `Rs. ${results.totalMin.toLocaleString()}`, `At n=${enrolment}`],
     ['Maximum plausible', `Rs. ${results.totalMax.toLocaleString()}`, 'Upper end of ranges'],
@@ -92,62 +114,75 @@ export default function COScreen() {
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.metrics}>
-        <MetricCard label="Children (n)" value={enrolment} accent={ACCENT} />
-        <MetricCard label="Per-child subtotal" value={`Rs. ${results.perChildMin.toLocaleString()}-${results.perChildMax.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Minimum feasible" value={`Rs. ${results.totalMin.toLocaleString()}`} subtitle={`Cap Rs. ${budgetCap.toLocaleString()}`} accent={results.feasible ? ACCENT : COLORS.accentRed} />
-        <MetricCard label="Max plausible" value={`Rs. ${results.totalMax.toLocaleString()}`} accent={ACCENT} />
+      <View style={styles.linkBanner}>
+        <Text style={styles.linkBannerText}>
+          Enrolment linked to Staffing tab: <Text style={styles.linkBannerNum}>n = {enrolment}</Text>
+        </Text>
       </View>
 
-      <SliderRow label="Target enrolment n" unit="children" value={enrolment} onChange={setEnrolment}
-        min={10} max={ENROLMENT_CAPACITY} step={1} accent={ACCENT} />
-      <SliderRow label="Monthly budget cap" unit="Rs." value={budgetCap} onChange={setBudgetCap}
-        min={200000} max={1500000} step={10000} accent={ACCENT}
-        formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
+      <View style={styles.metrics}>
+        <MetricCard label="Children (n)" value={enrolment} accent={ACCENT} icon="account-multiple" subtitle="from Staffing tab" />
+        <MetricCard label="Per-child subtotal" value={`Rs. ${results.perChildMin.toLocaleString()}-${results.perChildMax.toLocaleString()}`} accent={ACCENT} icon="cash-multiple" />
+        <MetricCard label="Minimum feasible" value={`Rs. ${results.totalMin.toLocaleString()}`} subtitle={`Cap Rs. ${planner.coBudgetCap.toLocaleString()}`} accent={results.feasible ? ACCENT : COLORS.accentRed} icon="arrow-down-bold-outline" />
+        <MetricCard label="Max plausible" value={`Rs. ${results.totalMax.toLocaleString()}`} accent={ACCENT} icon="arrow-up-bold-outline" />
+      </View>
 
-      <SectionTitle accent={ACCENT}>Fixed monthly ranges (Rs. / month)</SectionTitle>
-      {fixedRanges.map((item) => (
-        <DualSlider
-          key={item.id}
-          label={item.label}
-          value1={item.min}
-          value2={item.max}
-          onChange1={(v) => updateFixed(item.id, v, item.max)}
-          onChange2={(v) => updateFixed(item.id, item.min, v)}
-          min={0} max={300000} step={2500}
-          accent={ACCENT}
-          description="Drag both ends of the range"
-        />
-      ))}
+      <Section title="Budget cap" icon="cash-multiple" accent={ACCENT}>
+        <SliderRow plain label="Monthly budget cap" unit="Rs." value={planner.coBudgetCap}
+          onChange={(v) => planner.update({ coBudgetCap: v })}
+          min={200000} max={1500000} step={10000} accent={ACCENT}
+          formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
+      </Section>
 
-      <SectionTitle accent={ACCENT}>Per-child ranges (Rs. / child / month)</SectionTitle>
-      {perChildRanges.map((item) => (
-        <DualSlider
-          key={item.id}
-          label={item.label}
-          value1={item.min}
-          value2={item.max}
-          onChange1={(v) => updatePerChild(item.id, v, item.max)}
-          onChange2={(v) => updatePerChild(item.id, item.min, v)}
-          min={0} max={2500} step={25}
-          accent={ACCENT}
-          description="Per child per month"
-        />
-      ))}
+      <Section title="Fixed monthly ranges" icon="home-outline" accent={ACCENT}>
+        {fixedRanges.map((item) => (
+          <DualSlider
+            key={item.id}
+            plain
+            label={item.label}
+            value1={item.min}
+            value2={item.max}
+            onChange1={(v) => updateFixed(item.id, v, item.max)}
+            onChange2={(v) => updateFixed(item.id, item.min, v)}
+            min={0} max={300000} step={2500}
+            accent={ACCENT}
+            description="Drag both ends of the range"
+          />
+        ))}
+      </Section>
 
-      <TouchableOpacity onPress={autoSuggest} style={[styles.button, { borderColor: ACCENT }]} activeOpacity={0.8}>
-        <Text style={[styles.buttonText, { color: ACCENT }]}>Auto-suggest starter ranges</Text>
-      </TouchableOpacity>
-      {autoNote ? <Text style={styles.autoNote}>{autoNote}</Text> : null}
+      <Section title="Per-child ranges" icon="baby-face-outline" accent={ACCENT}>
+        {perChildRanges.map((item) => (
+          <DualSlider
+            key={item.id}
+            plain
+            label={item.label}
+            value1={item.min}
+            value2={item.max}
+            onChange1={(v) => updatePerChild(item.id, v, item.max)}
+            onChange2={(v) => updatePerChild(item.id, item.min, v)}
+            min={0} max={2500} step={25}
+            accent={ACCENT}
+            description="Per child per month"
+          />
+        ))}
+        <TouchableOpacity onPress={autoSuggest} style={[styles.button, { borderColor: ACCENT }]} activeOpacity={0.8}>
+          <Text style={[styles.buttonText, { color: ACCENT }]}>Auto-suggest starter ranges</Text>
+        </TouchableOpacity>
+        {autoNote ? <Text style={styles.autoNote}>{autoNote}</Text> : null}
+      </Section>
 
-      <SectionTitle accent={ACCENT}>Budget utilisation</SectionTitle>
-      <GaugeBar label="Minimum required" value={results.totalMin} max={Math.max(results.totalMax, budgetCap)}
-        accent={results.feasible ? ACCENT : COLORS.accentRed}
-        format={() => `Rs. ${results.totalMin.toLocaleString()}`} />
-      <GaugeBar label="Your budget cap" value={budgetCap} max={Math.max(results.totalMax, budgetCap)}
-        accent={COLORS.accentGR} format={() => `Rs. ${budgetCap.toLocaleString()}`} />
-      <GaugeBar label="Maximum plausible" value={results.totalMax} max={Math.max(results.totalMax, budgetCap)}
-        accent={COLORS.accentPF} format={() => `Rs. ${results.totalMax.toLocaleString()}`} />
+      <Section title="Budget utilisation" icon="gauge" accent={ACCENT}>
+        <View style={{ paddingVertical: 8 }}>
+          <GaugeBar label="Minimum required" value={results.totalMin} max={Math.max(results.totalMax, planner.coBudgetCap)}
+            accent={results.feasible ? ACCENT : COLORS.accentRed}
+            format={() => `Rs. ${results.totalMin.toLocaleString()}`} />
+          <GaugeBar label="Your budget cap" value={planner.coBudgetCap} max={Math.max(results.totalMax, planner.coBudgetCap)}
+            accent={COLORS.accentGR} format={() => `Rs. ${planner.coBudgetCap.toLocaleString()}`} />
+          <GaugeBar label="Maximum plausible" value={results.totalMax} max={Math.max(results.totalMax, planner.coBudgetCap)}
+            accent={COLORS.accentPF} format={() => `Rs. ${results.totalMax.toLocaleString()}`} />
+        </View>
+      </Section>
 
       {results.feasible ? (
         <ResultBox type="ok">
@@ -159,9 +194,9 @@ export default function COScreen() {
         </ResultBox>
       )}
 
-      <SectionTitle accent={ACCENT}>Allocation summary</SectionTitle>
-      <DataTable columns={['Category', 'Monthly range', 'Source']} rows={tableRows} flexes={[1.6, 1.4, 1.6]} />
-
+      <Section title="Allocation summary" icon="table" accent={ACCENT} defaultOpen={false}>
+        <DataTable columns={['Category', 'Monthly range', 'Source']} rows={tableRows} flexes={[1.6, 1.4, 1.6]} />
+      </Section>
     </ScrollView>
   );
 }
@@ -170,10 +205,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundPage },
   content: { paddingHorizontal: 20, paddingTop: 4 },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  hint: { fontSize: 12, color: '#6b7178', lineHeight: 17, marginTop: 4, marginBottom: 8 },
   button: {
-    marginTop: 12, borderWidth: 1.5, borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: '#fff',
+    marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: '#fff',
   },
   buttonText: { fontSize: 13.5, fontWeight: '700' },
   autoNote: { marginTop: 8, fontSize: 12, color: '#6b7178', fontStyle: 'italic' },
+  linkBanner: {
+    backgroundColor: `${ACCENT}12`,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 12,
+  },
+  linkBannerText: { fontSize: 12, color: COLORS.textSecondary },
+  linkBannerNum: { fontWeight: '800', color: ACCENT },
 });

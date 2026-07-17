@@ -1,16 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform,
-  Animated, Easing, LayoutAnimation, UIManager,
+  View, Text, StyleSheet, KeyboardAvoidingView, Platform, Pressable, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { COLORS, RADIUS, TAB_CONFIG } from '../constants/theme';
 import { TAB_INFO } from '../constants/infoContent';
 import InfoDrawer from './InfoDrawer';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
+function tap(style = 'light') {
+  try {
+    const map = { light: Haptics.ImpactFeedbackStyle.Light, medium: Haptics.ImpactFeedbackStyle.Medium };
+    Haptics.impactAsync(map[style] || map.light);
+  } catch (_) { /* ignore */ }
 }
 
 const TAB_ICONS = {
@@ -21,64 +24,27 @@ const TAB_ICONS = {
   pf: 'finance',
 };
 
-const LAYOUT_ANIM = {
-  duration: 260,
-  create: { type: 'easeInEaseOut', property: 'opacity' },
-  update: { type: 'spring', springDamping: 0.82 },
-  delete: { type: 'easeInEaseOut', property: 'opacity' },
-};
-
-function TabButton({ tab, isActive, onPress }) {
-  const progress = useRef(new Animated.Value(isActive ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: isActive ? 1 : 0,
-      duration: 240,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [isActive, progress]);
-
-  const bg = progress.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0)', tab.tint] });
-  const iconColor = isActive ? tab.accent : COLORS.textSecondary;
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: isActive }}
-      accessibilityLabel={`${tab.label} tab`}
-    >
-      <Animated.View style={[styles.tabButton, isActive && styles.tabButtonActive, { backgroundColor: bg }]}>
-        <MaterialCommunityIcons name={TAB_ICONS[tab.id]} size={20} color={iconColor} />
-        {isActive ? (
-          <Animated.Text
-            style={[
-              styles.tabLabel,
-              { color: tab.accent, opacity: progress },
-            ]}
-            numberOfLines={1}
-          >
-            {tab.label}
-          </Animated.Text>
-        ) : null}
-      </Animated.View>
-    </TouchableOpacity>
-  );
-}
+const TAB_WIDTH_INACTIVE = 54;
+const TAB_WIDTH_ACTIVE = 132;
+const PILL_INSET = 4;
+const BAR_PAD = 6;
 
 export default function AppShell({ activeTab, onChangeTab, title, subtitle, children }) {
   const [infoOpen, setInfoOpen] = useState(false);
   const currentTab = TAB_CONFIG.find((t) => t.id === activeTab) || TAB_CONFIG[0];
   const info = TAB_INFO[activeTab];
+  const activeIndex = TAB_CONFIG.findIndex((t) => t.id === activeTab);
+  const pillX = useRef(new Animated.Value(activeIndex * TAB_WIDTH_INACTIVE + PILL_INSET)).current;
 
-  const handleTabPress = (id) => {
-    if (id === activeTab) return;
-    LayoutAnimation.configureNext(LAYOUT_ANIM);
-    onChangeTab(id);
-  };
+  useEffect(() => {
+    Animated.spring(pillX, {
+      toValue: activeIndex * TAB_WIDTH_INACTIVE + PILL_INSET,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 240,
+      mass: 0.7,
+    }).start();
+  }, [activeIndex, pillX]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
@@ -88,34 +54,70 @@ export default function AppShell({ activeTab, onChangeTab, title, subtitle, chil
       >
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>{currentTab.label.toUpperCase()}</Text>
-            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>{title}</Text>
-            {subtitle ? <Text style={styles.subtitle} numberOfLines={2}>{subtitle}</Text> : null}
+            <Text style={styles.eyebrow} numberOfLines={1}>{title}</Text>
+            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>{currentTab.heading}</Text>
+            {currentTab.subtitle ? (
+              <Text style={styles.subtitle} numberOfLines={2}>{currentTab.subtitle}</Text>
+            ) : null}
           </View>
 
-          <TouchableOpacity
-            onPress={() => setInfoOpen(true)}
-            style={[styles.infoBtn, { backgroundColor: currentTab.tint }]}
-            activeOpacity={0.7}
+          <Pressable
+            onPress={() => { tap('medium'); setInfoOpen(true); }}
+            style={({ pressed }) => [
+              styles.infoBtn,
+              { backgroundColor: currentTab.tint, opacity: pressed ? 0.85 : 1 },
+            ]}
+            android_ripple={null}
             accessibilityRole="button"
             accessibilityLabel="Show model information and formulas"
           >
             <MaterialCommunityIcons name="information-outline" size={22} color={currentTab.accent} />
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         <View style={styles.content}>{children}</View>
 
         <View style={styles.tabBarWrap} pointerEvents="box-none">
           <View style={styles.tabBar}>
-            {TAB_CONFIG.map((tab) => (
-              <TabButton
-                key={tab.id}
-                tab={tab}
-                isActive={tab.id === activeTab}
-                onPress={() => handleTabPress(tab.id)}
-              />
-            ))}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pill,
+                {
+                  width: TAB_WIDTH_ACTIVE - PILL_INSET * 2,
+                  backgroundColor: currentTab.tint,
+                  transform: [{ translateX: pillX }],
+                },
+              ]}
+            />
+            {TAB_CONFIG.map((tab) => {
+              const isActive = tab.id === activeTab;
+              return (
+                <Pressable
+                  key={tab.id}
+                  onPress={() => { if (tab.id !== activeTab) { tap('light'); onChangeTab(tab.id); } }}
+                  style={[styles.tabButton, { width: isActive ? TAB_WIDTH_ACTIVE : TAB_WIDTH_INACTIVE }]}
+                  android_ripple={null}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={`${tab.label} tab`}
+                >
+                  <MaterialCommunityIcons
+                    name={TAB_ICONS[tab.id]}
+                    size={22}
+                    color={isActive ? tab.accent : 'rgba(255,255,255,0.85)'}
+                  />
+                  {isActive ? (
+                    <Text
+                      style={[styles.tabLabel, { color: tab.accent }]}
+                      numberOfLines={1}
+                    >
+                      {tab.label}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -148,17 +150,17 @@ const styles = StyleSheet.create({
   },
   headerText: { flex: 1 },
   eyebrow: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '500',
     color: COLORS.textMuted,
-    letterSpacing: 1.2,
     marginBottom: 4,
   },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    letterSpacing: -0.4,
+    letterSpacing: -0.6,
+    lineHeight: 36,
   },
   subtitle: {
     marginTop: 4,
@@ -182,28 +184,30 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     backgroundColor: COLORS.backgroundInverse,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
+    paddingHorizontal: BAR_PAD,
+    paddingVertical: BAR_PAD,
     shadowColor: '#000',
     shadowOpacity: 0.18,
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 16,
     elevation: 10,
+    position: 'relative',
+  },
+  pill: {
+    position: 'absolute',
+    top: BAR_PAD,
+    bottom: BAR_PAD,
+    left: BAR_PAD - PILL_INSET,
+    borderRadius: RADIUS.pill,
   },
   tabButton: {
-    minHeight: 44,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
+    minHeight: 56,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
-  tabButtonActive: {
-    paddingHorizontal: 16,
-  },
-  tabLabel: { fontSize: 12.5, fontWeight: '700' },
+  tabLabel: { fontSize: 14, fontWeight: '700' },
 });
