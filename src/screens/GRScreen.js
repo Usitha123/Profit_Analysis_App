@@ -57,10 +57,10 @@ export default function GRScreen() {
       </View>
 
       <Section title="Growth parameters" icon="tune" accent={ACCENT}>
-        <SliderRow plain label="Initial enrolment N0 (Q6)" unit="children" value={planner.initialEnrolment}
+        <SliderRow plain label="Initial enrolment N0" unit="children" value={planner.initialEnrolment}
           onChange={(v) => planner.update({ initialEnrolment: v })}
           min={5} max={50} step={1} accent={ACCENT} />
-        <SliderRow plain label="Capacity K (Q5)" unit="children" value={planner.capacity}
+        <SliderRow plain label="Capacity K" unit="children" value={planner.capacity}
           onChange={(v) => planner.update({ capacity: v })}
           min={15} max={120} step={1} accent={ACCENT} />
         <SliderRow plain label="Growth rate r"

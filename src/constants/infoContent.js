@@ -18,7 +18,7 @@ export const TAB_INFO = {
       {
         type: 'equation',
         title: 'Optimisation',
-        text: 'Minimise Z = S_mgr*m + S_teach*t + S_baby*b + S_help*h + S_sec*s\nSubject to:\n  baby carers   >= ceil(infants / 3)\n  helpers       >= ceil(toddlers / 5)\n  teachers      >= ceil(pre / 8) + ceil(school / 12)\n  manager = 1, security = 1\n  Z <= Budget cap',
+        text: 'Minimise Z = S_mgr*m + S_teach*t + S_baby*b + S_help*h + S_sec*s\nSubject to:\n  baby carers   >= ceil(infants / 3)\n  helpers       >= ceil(toddlers / 4)\n  teachers      >= ceil(pre / 6) + ceil(school / 10)\n  manager = 1, security = 1\n  Z <= Budget cap',
       },
       {
         type: 'reference',

@@ -1,3 +1,5 @@
+import { CHART_PALETTE } from './theme';
+
 export const MKT_CHANNELS = [
   { id: 'social', label: 'Social media ads', cost: 18000, enrollments: 8, active: true },
   { id: 'referral', label: 'Referral rewards', cost: 9000, enrollments: 5, active: true },
@@ -43,10 +45,10 @@ export const NON_DEPRECIABLE_OUTLAY = [
 ];
 
 export const AGE_GROUPS = [
-  { id: 'infant', label: 'Infants (6-18 mo)', ratio: 3, rate: 26000, color: '#5b9bd5', min: 0, max: 15, default: 5 },
-  { id: 'toddler', label: 'Toddlers (18 mo - 3 yr)', ratio: 5, rate: 30000, color: '#70ad47', min: 0, max: 20, default: 7 },
-  { id: 'preschool', label: 'Pre-schoolers (3-5 yr)', ratio: 8, rate: 34000, color: '#ffc000', min: 0, max: 25, default: 9 },
-  { id: 'schoolage', label: 'School-age (5-10 yr)', ratio: 12, rate: 34000, color: '#ed7d31', min: 0, max: 20, default: 7 },
+  { id: 'infant', label: 'Infants (below 2 yrs)', ratio: 3, rate: 26000, color: CHART_PALETTE[0], min: 0, max: 15, default: 5 },
+  { id: 'toddler', label: 'Toddlers (2-3 yrs)', ratio: 4, rate: 30000, color: CHART_PALETTE[1], min: 0, max: 20, default: 7 },
+  { id: 'preschool', label: 'Pre-schoolers (3-5 yrs)', ratio: 6, rate: 34000, color: CHART_PALETTE[2], min: 0, max: 25, default: 9 },
+  { id: 'schoolage', label: 'School-age (5-10 yrs)', ratio: 10, rate: 34000, color: CHART_PALETTE[3], min: 0, max: 20, default: 7 },
 ];
 
 // Age-group mix used by CO tab to size the staff floor for a target enrolment.
@@ -89,11 +91,11 @@ export const FURNITURE_REFERENCE = [
 ];
 
 export const FIXED_COST_RANGES = [
-  { id: 'rent', label: 'Rent (Q11)', min: 55000, max: 85000 },
-  { id: 'utilities', label: 'Utilities (Q12)', min: 12500, max: 20000 },
-  { id: 'insurance', label: 'Insurance and other (Q15)', min: 7500, max: 15000 },
-  { id: 'marketing', label: 'Marketing (Q18)', min: 3500, max: 10000 },
-  { id: 'activities', label: 'Activities amortised (Q16)', min: 12000, max: 20000 },
+  { id: 'rent', label: 'Rent', min: 55000, max: 85000 },
+  { id: 'utilities', label: 'Utilities', min: 12500, max: 20000 },
+  { id: 'insurance', label: 'Insurance and other', min: 7500, max: 15000 },
+  { id: 'marketing', label: 'Marketing', min: 3500, max: 10000 },
+  { id: 'activities', label: 'Activities amortised', min: 12000, max: 20000 },
 ];
 
 export const PER_CHILD_COST_RANGES = [

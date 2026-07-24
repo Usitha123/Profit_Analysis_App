@@ -10,7 +10,7 @@ import SliderRow from '../components/SliderRow';
 import CheckRow from '../components/CheckRow';
 import ResultBox from '../components/ResultBox';
 import Section from '../components/Section';
-import { StackedBar } from '../components/GaugeBar';
+import DonutChart from '../components/DonutChart';
 import DataTable from '../components/DataTable';
 
 const { allocateMarketing } = require('../utils/calculations');
@@ -99,7 +99,7 @@ export default function BEScreen() {
         <MetricCard label="P/L at 30" value={`Rs. ${p30.toLocaleString()}`} subtitle={p30 >= 0 ? 'profit before deprec.' : 'loss before deprec.'} accent={p30 >= 0 ? ACCENT : COLORS.accentRed} icon="chart-line" trend={p30 >= 0 ? 'up' : 'down'} />
       </View>
 
-      <Section title="Fee per child (Q9-Q10)" icon="tag-outline" accent={ACCENT}>
+      <Section title="Fee per child" icon="tag-outline" accent={ACCENT}>
         <SliderRow
           plain
           label="Base monthly fee"
@@ -132,34 +132,34 @@ export default function BEScreen() {
       </Section>
 
       <Section title="Fixed monthly cost (Rs. / month)" icon="home-outline" accent={ACCENT}>
-        <SliderRow plain label="Rent (Q11)" unit="Rs." value={planner.rent}
+        <SliderRow plain label="Rent" unit="Rs." value={planner.rent}
           onChange={(v) => planner.update({ rent: v })}
           min={10000} max={300000} step={2500} accent={ACCENT}
           formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
-        <SliderRow plain label="Utilities (Q12)" unit="Rs." value={planner.utilities}
+        <SliderRow plain label="Utilities" unit="Rs." value={planner.utilities}
           onChange={(v) => planner.update({ utilities: v })}
           min={10000} max={80000} step={2500} accent={ACCENT}
           formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
-        <SliderRow plain label="Total staff salaries (Q14)" unit="Rs." value={planner.staffSalaries}
+        <SliderRow plain label="Total staff salaries" unit="Rs." value={planner.staffSalaries}
           onChange={(v) => planner.update({ staffSalaries: v })}
           min={50000} max={600000} step={5000} accent={ACCENT}
           formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
-        <SliderRow plain label="Insurance and other (Q15)" unit="Rs." value={planner.otherFixed}
+        <SliderRow plain label="Insurance and other" unit="Rs." value={planner.otherFixed}
           onChange={(v) => planner.update({ otherFixed: v })}
           min={5000} max={80000} step={2500} accent={ACCENT}
           formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
-        <SliderRow plain label="Marketing (Q18)" unit="Rs." value={planner.marketingFixed}
+        <SliderRow plain label="Marketing" unit="Rs." value={planner.marketingFixed}
           onChange={(v) => planner.update({ marketingFixed: v })}
           min={2500} max={60000} step={500} accent={ACCENT}
           formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
       </Section>
 
-      <Section title="Marketing mix (Q17)" icon="bullhorn-outline" accent={ACCENT} defaultOpen={false}>
+      <Section title="Marketing mix" icon="bullhorn-outline" accent={ACCENT} defaultOpen={false}>
         <Text style={styles.hint}>Allocated proportionally from your marketing total (Rs. {planner.marketingFixed.toLocaleString()}/mo).</Text>
-        <DataTable columns={['Channel', 'Budget', 'Expected reach']} rows={mktRows} flexes={[1.6, 1, 1.6]} />
+        <DataTable columns={['Channel', 'Budget', 'Expected reach']} rows={mktRows} flexes={[1.5, 1, 1.5]} />
       </Section>
 
-      <Section title="Annual activities (Q16)" icon="party-popper" accent={ACCENT} defaultOpen={false}>
+      <Section title="Annual activities" icon="party-popper" accent={ACCENT} defaultOpen={false}>
         <Text style={styles.hint}>Total annual activity spend gets amortised into fixed cost. Currently Rs. {activitiesMonthly.toLocaleString()}/mo.</Text>
         {activities.map((a) => (
           <CheckRow
@@ -176,7 +176,7 @@ export default function BEScreen() {
         ))}
       </Section>
 
-      <Section title="Variable cost per child (Q13)" icon="silverware-fork-knife" accent={ACCENT} defaultOpen={false}>
+      <Section title="Variable cost per child" icon="silverware-fork-knife" accent={ACCENT} defaultOpen={false}>
         <SliderRow plain label="Food and supplies" unit="Rs./child" value={planner.variableFood}
           onChange={(v) => planner.update({ variableFood: v })}
           min={100} max={2500} step={25} accent={ACCENT}
@@ -196,18 +196,18 @@ export default function BEScreen() {
       </Section>
 
       <Section title="Fixed cost composition" icon="chart-donut" accent={ACCENT} defaultOpen={false}>
-        <StackedBar
+        <DonutChart
           segments={[planner.rent, planner.utilities, planner.staffSalaries, planner.otherFixed, planner.marketingFixed, activitiesMonthly]}
-          colors={['#3d6ea5', '#2f8f83', '#c98a1f', '#8a4a86', '#c0574f', '#70ad47']}
           labels={['Rent', 'Utilities', 'Staff', 'Insurance/other', 'Marketing', 'Activities']}
+          centerCaption="Fixed / month"
         />
       </Section>
 
       <Section title="Variable composition (per child)" icon="chart-donut-variant" accent={ACCENT} defaultOpen={false}>
-        <StackedBar
+        <DonutChart
           segments={[planner.variableFood, planner.variableEducation, planner.variableActivity, planner.variableMaintenance]}
-          colors={['#3d6ea5', '#c98a1f', '#8a4a86', '#c0574f']}
           labels={['Food', 'Education', 'Activity mat.', 'Maintenance']}
+          centerCaption="Per child / month"
         />
       </Section>
 

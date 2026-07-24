@@ -21,9 +21,9 @@ function staffFloorForEnrolment(n) {
   const toddler = Math.round(n * CO_AGE_MIX.toddler);
   const preschool = Math.round(n * CO_AGE_MIX.preschool);
   const schoolage = Math.max(0, n - infant - toddler - preschool);
-  const teachers = Math.ceil(preschool / 8) + Math.ceil(schoolage / 12);
+  const teachers = Math.ceil(preschool / 6) + Math.ceil(schoolage / 10);
   const caretakers = Math.ceil(infant / 3);
-  const helpers = Math.ceil(toddler / 5);
+  const helpers = Math.ceil(toddler / 4);
   return STAFF_ROLES.reduce((sum, role) => {
     if (role.id === 'manager' || role.id === 'security') return sum + role.salary;
     if (role.id === 'teacher') return sum + teachers * role.salary;
@@ -96,16 +96,18 @@ export default function COScreen() {
     setAutoNote(`Scaled ranges for n=${enrolment} using survey baseline at n=28.`);
   };
 
+  // Amounts drop the "Rs." prefix - the column header carries the unit, which
+  // keeps each range on a single line at phone widths.
   const tableRows = [
-    ...fixedRanges.map((i) => [i.label, `Rs. ${i.min.toLocaleString()} - ${i.max.toLocaleString()}`, 'Fixed / month']),
-    ['Staff floor', `Rs. ${staffFloor.toLocaleString()}`, `From LP at n=${enrolment}`],
+    ...fixedRanges.map((i) => [i.label, `${i.min.toLocaleString()} - ${i.max.toLocaleString()}`, 'Fixed / month']),
+    ['Staff floor', staffFloor.toLocaleString(), `From LP at n=${enrolment}`],
     ...perChildRanges.map((i) => [
       i.label,
-      `Rs. ${(i.min * enrolment).toLocaleString()} - ${(i.max * enrolment).toLocaleString()}`,
-      `Rs. ${i.min}-${i.max}/child × ${enrolment}`,
+      `${(i.min * enrolment).toLocaleString()} - ${(i.max * enrolment).toLocaleString()}`,
+      `${i.min}-${i.max}/child × ${enrolment}`,
     ]),
-    ['Minimum feasible C*', `Rs. ${results.totalMin.toLocaleString()}`, `At n=${enrolment}`],
-    ['Maximum plausible', `Rs. ${results.totalMax.toLocaleString()}`, 'Upper end of ranges'],
+    ['Minimum feasible C*', results.totalMin.toLocaleString(), `At n=${enrolment}`],
+    ['Maximum plausible', results.totalMax.toLocaleString(), 'Upper end of ranges'],
   ];
 
   return (
@@ -195,7 +197,7 @@ export default function COScreen() {
       )}
 
       <Section title="Allocation summary" icon="table" accent={ACCENT} defaultOpen={false}>
-        <DataTable columns={['Category', 'Monthly range', 'Source']} rows={tableRows} flexes={[1.6, 1.4, 1.6]} />
+        <DataTable columns={['Category', 'Monthly range (Rs.)', 'Source']} rows={tableRows} flexes={[1.25, 1.5, 1.25]} />
       </Section>
     </ScrollView>
   );

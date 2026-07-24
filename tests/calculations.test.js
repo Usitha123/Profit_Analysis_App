@@ -15,9 +15,9 @@ test('calculateStaffing computes ratio-derived roles via driver map', () => {
     children: { infant: 5, toddler: 7, preschool: 9, schoolage: 7 },
     ageGroups: [
       { id: 'infant', ratio: 3, rate: 26000 },
-      { id: 'toddler', ratio: 5, rate: 30000 },
-      { id: 'preschool', ratio: 8, rate: 34000 },
-      { id: 'schoolage', ratio: 12, rate: 34000 },
+      { id: 'toddler', ratio: 4, rate: 30000 },
+      { id: 'preschool', ratio: 6, rate: 34000 },
+      { id: 'schoolage', ratio: 10, rate: 34000 },
     ],
     staffRoles: [
       { id: 'manager', salary: 46000, required: 1, fixedCount: true },

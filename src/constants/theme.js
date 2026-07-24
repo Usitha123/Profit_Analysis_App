@@ -33,6 +33,23 @@ export const COLORS = {
   shadow: 'rgba(15, 23, 42, 0.06)',
 };
 
+// Categorical chart palette. Fixed order - assign slot by series index, never
+// cycle or recolour when a series is filtered out. Validated on a #ffffff
+// surface for lightness band, chroma floor, colour-blind separation (worst
+// adjacent pair dE 9.1 protan) and normal-vision separation (worst 19.6).
+// Slots 2, 4 and 5 sit under 3:1 contrast, so every chart using this palette
+// must carry visible text labels - never colour alone.
+export const CHART_PALETTE = [
+  '#2a78d6', // blue
+  '#eb6834', // orange
+  '#1baf7a', // aqua
+  '#eda100', // yellow
+  '#e87ba4', // magenta
+  '#008300', // green
+  '#4a3aa7', // violet
+  '#e34948', // red
+];
+
 // soft pastel background tints paired with each accent (for cards / active pills)
 export const ACCENT_TINTS = {
   lp: '#e6efff',

@@ -46,8 +46,8 @@ export default function LPScreen() {
     const kids = planner.children;
     return [
       { label: `Infants 1:3 → need ≥ ${Math.ceil((kids.infant || 0) / 3)} caretaker(s)`, ok: (roleCounts.baby || 0) >= (groupCounts.infant || 0) },
-      { label: `Toddlers 1:5 → need ≥ ${Math.ceil((kids.toddler || 0) / 5)} helper(s)`, ok: (roleCounts.helper || 0) >= (groupCounts.toddler || 0) },
-      { label: `Pre-school 1:8 and school-age 1:12 covered by teacher pool`, ok: (roleCounts.teacher || 0) >= ((groupCounts.preschool || 0) + (groupCounts.schoolage || 0)) },
+      { label: `Toddlers 1:4 → need ≥ ${Math.ceil((kids.toddler || 0) / 4)} helper(s)`, ok: (roleCounts.helper || 0) >= (groupCounts.toddler || 0) },
+      { label: `Pre-school 1:6 and school-age 1:10 covered by teacher pool`, ok: (roleCounts.teacher || 0) >= ((groupCounts.preschool || 0) + (groupCounts.schoolage || 0)) },
       { label: `Budget cap Rs. ${planner.lpBudgetCap.toLocaleString()} vs staff cost Rs. ${results.totalStaffCost.toLocaleString()}`, ok: results.totalStaffCost <= planner.lpBudgetCap },
     ];
   }, [planner.children, planner.lpBudgetCap, results]);
@@ -75,7 +75,7 @@ export default function LPScreen() {
         <MetricCard label="Cost per child" value={`Rs. ${costPerChild.toLocaleString()}`} subtitle="staff only" accent={ACCENT} icon="account-cash-outline" />
       </View>
 
-      <Section title="Enrolment (Q4-Q6)" icon="baby-carriage" accent={ACCENT}>
+      <Section title="Enrolment" icon="baby-carriage" accent={ACCENT}>
         {AGE_GROUPS.map((group) => (
           <SliderRow
             key={group.id}
@@ -105,7 +105,7 @@ export default function LPScreen() {
         />
       </Section>
 
-      <Section title="Role salaries (Q8)" icon="account-tie-outline" accent={ACCENT}>
+      <Section title="Role salaries" icon="account-tie-outline" accent={ACCENT}>
         {roles.map((role) => (
           <SliderRow
             key={role.id}
@@ -125,7 +125,7 @@ export default function LPScreen() {
       </Section>
 
       <Section title="Optimal staff allocation" icon="table" accent={ACCENT}>
-        <DataTable columns={['Role', 'Qty', 'Salary', 'Monthly cost']} rows={roleRows} flexes={[2.2, 0.7, 1.3, 1.4]} />
+        <DataTable columns={['Role', 'Qty', 'Salary', 'Monthly cost']} rows={roleRows} flexes={[1.9, 0.55, 1.3, 1.45]} />
       </Section>
 
       <Section title="Constraints satisfied" icon="check-decagram-outline" accent={ACCENT}>

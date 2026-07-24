@@ -1,17 +1,20 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, StyleSheet, Dimensions, Platform,
+  View, Text, ScrollView, TextInput, StyleSheet, Dimensions, Platform, Pressable, Alert,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { exportPlannerReport } from '../utils/report';
 import Svg, { Line, Rect, Text as SvgText, G, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { DEP_ASSETS, NON_DEPRECIABLE_OUTLAY, ROADMAP } from '../constants/modelData';
+import { DEP_ASSETS, NON_DEPRECIABLE_OUTLAY } from '../constants/modelData';
 import { usePlanner } from '../context/PlannerContext';
 import MetricCard from '../components/MetricCard';
 import ResultBox from '../components/ResultBox';
 import Section from '../components/Section';
-import { StackedBar } from '../components/GaugeBar';
-import PhaseRoadmap from '../components/PhaseRoadmap';
+import DonutChart from '../components/DonutChart';
+// import PhaseRoadmap from '../components/PhaseRoadmap'; // roadmap section hidden this release
 
 const { calculateProfit } = require('../utils/calculations');
 
@@ -29,6 +32,20 @@ export default function PFScreen() {
   const insets = useSafeAreaInsets();
   const planner = usePlanner();
   const enrolment = Math.max(1, planner.totalChildren || 1);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (exporting) return;
+    try {
+      setExporting(true);
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
+      await exportPlannerReport(planner);
+    } catch (e) {
+      Alert.alert('Export failed', String(e?.message || e));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const assets = useMemo(
     () => DEP_ASSETS.map((meta) => {
@@ -103,9 +120,9 @@ export default function PFScreen() {
         <View style={styles.assetTable}>
           <View style={styles.assetHeader}>
             <Text style={[styles.assetHeaderCell, { flex: 2.1 }]}>Asset</Text>
-            <Text style={styles.assetHeaderCell}>Cost</Text>
-            <Text style={styles.assetHeaderCell}>Life (yr)</Text>
-            <Text style={[styles.assetHeaderCell, { textAlign: 'right' }]}>Dep./mo</Text>
+            <Text style={[styles.assetHeaderCell, styles.assetHeaderCost]}>Cost</Text>
+            <Text style={[styles.assetHeaderCell, styles.assetHeaderLife]}>Life (yr)</Text>
+            <Text style={[styles.assetHeaderCell, styles.assetHeaderDep]}>Dep./mo</Text>
           </View>
           {assets.map((a) => {
             const monthlyDep = a.life > 0 ? a.cost / (a.life * 12) : a.cost;
@@ -156,10 +173,10 @@ export default function PFScreen() {
       )}
 
       <Section title="Capital allocation" icon="chart-donut" accent={ACCENT} defaultOpen={false}>
-        <StackedBar
+        <DonutChart
           segments={assets.map((a) => a.cost)}
-          colors={['#3d6ea5', '#2f8f83', '#c98a1f', '#8a4a86', '#c0574f', '#70ad47', '#ed7d31', '#6b7178']}
           labels={assets.map((a) => a.label)}
+          centerCaption="Depreciable capex"
         />
       </Section>
 
@@ -201,9 +218,27 @@ export default function PFScreen() {
         </View>
       </Section>
 
+      {/* Phase roadmap hidden for this release. To restore, re-enable the ROADMAP
+          and PhaseRoadmap imports above and uncomment this block.
       <Section title="Phase roadmap" icon="road-variant" accent={ACCENT} defaultOpen={false}>
         <PhaseRoadmap phases={ROADMAP} accent={ACCENT} />
       </Section>
+      */}
+
+      <Pressable
+        onPress={handleExport}
+        disabled={exporting}
+        style={({ pressed }) => [
+          styles.exportBtn,
+          { backgroundColor: exporting ? '#334155' : COLORS.backgroundInverse, opacity: pressed ? 0.9 : 1 },
+        ]}
+        android_ripple={null}
+      >
+        <MaterialCommunityIcons name={exporting ? 'progress-download' : 'file-pdf-box'} size={20} color="#fff" />
+        <Text style={styles.exportText}>
+          {exporting ? 'Preparing PDF…' : 'Export full report (PDF)'}
+        </Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -216,6 +251,11 @@ const styles = StyleSheet.create({
   assetTable: { borderRadius: 12, overflow: 'hidden', backgroundColor: '#fff' },
   assetHeader: { flexDirection: 'row', backgroundColor: '#f4f5f7', paddingHorizontal: 10, paddingVertical: 8 },
   assetHeaderCell: { flex: 1, fontSize: 10.5, fontWeight: '700', color: '#6b7178', textTransform: 'uppercase' },
+  // Widths mirror the body row exactly (input width + its marginLeft) so the
+  // headers sit over the columns they label.
+  assetHeaderCost: { flex: 0, width: 82, marginLeft: 6, paddingRight: 6, textAlign: 'right' },
+  assetHeaderLife: { flex: 0, width: 54, marginLeft: 6, paddingRight: 6, textAlign: 'right' },
+  assetHeaderDep: { flex: 1, marginLeft: 6, textAlign: 'right' },
   assetRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#eef0f3' },
   assetCell: { flex: 1, fontSize: 11.5, color: '#232a2e', lineHeight: 16 },
   assetInput: {
@@ -241,4 +281,26 @@ const styles = StyleSheet.create({
   },
   linkBannerText: { fontSize: 12, color: COLORS.textSecondary },
   linkBannerNum: { fontWeight: '800', color: ACCENT },
+  exportBtn: {
+    marginTop: 22,
+    borderRadius: 999,
+    paddingVertical: 16,
+    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 56,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  exportText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
 });
