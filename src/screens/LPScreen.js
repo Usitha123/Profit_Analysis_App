@@ -1,247 +1,152 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet,
-} from 'react-native';
+import React, { useMemo } from 'react';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { AGE_GROUPS, MKT_CHANNELS, ROADMAP, TUITION_RATE, OPERATING_WEEKS } from '../constants/modelData';
+import { AGE_GROUPS, STAFF_ROLES } from '../constants/modelData';
+import { usePlanner } from '../context/PlannerContext';
 import MetricCard from '../components/MetricCard';
 import SliderRow from '../components/SliderRow';
-import CheckRow from '../components/CheckRow';
-import { SectionTitle } from '../components/ResultBox';
-import EquationBox from '../components/EquationBox';
-import PhaseRoadmap from '../components/PhaseRoadmap';
-import { StackedBar } from '../components/GaugeBar';
+import ResultBox from '../components/ResultBox';
+import Section from '../components/Section';
+import ConstraintList from '../components/ConstraintList';
+import DataTable from '../components/DataTable';
+
+const { calculateStaffing } = require('../utils/calculations');
 
 const ACCENT = COLORS.accentLP;
 
 export default function LPScreen() {
   const insets = useSafeAreaInsets();
-  const [children, setChildren] = useState({
-    infant: 4,
-    toddler: 8,
-    preschool: 12,
-    schoolage: 6,
-  });
+  const planner = usePlanner();
 
-  const [channels, setChannels] = useState(
-    MKT_CHANNELS.map((c) => ({ ...c }))
+  const roles = useMemo(
+    () => STAFF_ROLES.map((meta) => {
+      const saved = (planner.roles || []).find((r) => r.id === meta.id);
+      return { ...meta, salary: saved?.salary ?? meta.salary };
+    }),
+    [planner.roles],
   );
 
-  const [budget, setBudget] = useState(22000);
+  const results = useMemo(() => calculateStaffing({
+    children: planner.children,
+    ageGroups: AGE_GROUPS,
+    staffRoles: roles,
+    budgetCap: planner.lpBudgetCap,
+  }), [planner.children, roles, planner.lpBudgetCap]);
 
-  const toggleChannel = useCallback((id) => {
-    setChannels((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c))
-    );
-  }, []);
+  const setChild = (id, value) => planner.update({ children: { ...planner.children, [id]: value } });
+  const setSalary = (id, salary) => {
+    const next = (planner.roles || []).map((r) => (r.id === id ? { ...r, salary } : r));
+    planner.update({ roles: next });
+  };
 
-  const updateChannelCost = useCallback((id, val) => {
-    setChannels((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, cost: val } : c))
-    );
-  }, []);
+  const constraints = useMemo(() => {
+    const groupCounts = results.staffByGroup.reduce((acc, g) => { acc[g.id] = g.staffNeeded; return acc; }, {});
+    const roleCounts = results.roleAllocations.reduce((acc, r) => { acc[r.id] = r.required; return acc; }, {});
+    const kids = planner.children;
+    return [
+      { label: `Infants 1:3 → need ≥ ${Math.ceil((kids.infant || 0) / 3)} caretaker(s)`, ok: (roleCounts.baby || 0) >= (groupCounts.infant || 0) },
+      { label: `Toddlers 1:4 → need ≥ ${Math.ceil((kids.toddler || 0) / 4)} helper(s)`, ok: (roleCounts.helper || 0) >= (groupCounts.toddler || 0) },
+      { label: `Pre-school 1:6 and school-age 1:10 covered by teacher pool`, ok: (roleCounts.teacher || 0) >= ((groupCounts.preschool || 0) + (groupCounts.schoolage || 0)) },
+      { label: `Budget cap Rs. ${planner.lpBudgetCap.toLocaleString()} vs staff cost Rs. ${results.totalStaffCost.toLocaleString()}`, ok: results.totalStaffCost <= planner.lpBudgetCap },
+    ];
+  }, [planner.children, planner.lpBudgetCap, results]);
 
-  const results = useMemo(() => {
-    let totalChildren = 0;
-    const staffByGroup = AGE_GROUPS.map((g) => {
-      const count = children[g.id] || 0;
-      totalChildren += count;
-      const staffNeeded = Math.ceil(count / g.ratio);
-      const staffCost = staffNeeded * g.rate * OPERATING_WEEKS;
-      return { ...g, count, staffNeeded, staffCost };
-    });
-
-    const totalStaff = staffByGroup.reduce((s, g) => s + g.staffNeeded, 0);
-    const totalStaffCost = staffByGroup.reduce((s, g) => s + g.staffCost, 0);
-
-    const activeChannels = channels.filter((c) => c.active);
-    const mktCost = activeChannels.reduce((s, c) => s + c.cost, 0);
-    const mktEnroll = activeChannels.reduce((s, c) => s + c.enrollments, 0);
-
-    const totalCost = totalStaffCost + mktCost;
-    const projectedRevenue = totalChildren * TUITION_RATE;
-
-    return {
-      totalChildren,
-      staffByGroup,
-      totalStaff,
-      totalStaffCost,
-      mktCost,
-      mktEnroll,
-      totalCost,
-      projectedRevenue,
-      overBudget: totalCost > budget,
-    };
-  }, [children, channels, budget]);
+  const roleRows = results.roleAllocations.map((role) => ([
+    role.label,
+    String(role.required),
+    `Rs. ${role.salary.toLocaleString()}`,
+    `Rs. ${role.monthlyCost.toLocaleString()}`,
+  ]));
+  const totalStaff = results.roleAllocations.reduce((sum, r) => sum + r.required, 0);
+  roleRows.push(['Total', String(totalStaff), '', `Rs. ${results.totalStaffCost.toLocaleString()}`]);
+  const costPerChild = results.totalChildren > 0 ? Math.round(results.totalStaffCost / results.totalChildren) : 0;
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.intro}>
-        Optimise staffing levels based on child-to-carer ratios, enrolment numbers,
-        and marketing channels. Adjust the parameters below to see the optimal staffing plan.
-      </Text>
-
-      {/* Metrics Grid */}
-      <View style={styles.grid3}>
-        <MetricCard label="Total Children" value={results.totalChildren} accent={ACCENT} />
-        <MetricCard label="Staff Needed" value={results.totalStaff} accent={ACCENT} />
-        <MetricCard label="Staff Cost" value={`Rs. ${results.totalStaffCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Budget" value={`Rs. ${budget.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Marketing Cost" value={`Rs. ${results.mktCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Revenue" value={`Rs. ${results.projectedRevenue.toLocaleString()}`} accent={ACCENT} />
+      <View style={styles.metrics}>
+        <MetricCard label="Children" value={results.totalChildren} accent={ACCENT} icon="account-multiple-outline" />
+        <MetricCard label="Total staff" value={totalStaff} subtitle="all roles combined" accent={ACCENT} icon="account-group-outline" />
+        <MetricCard label="Min staff cost" value={`Rs. ${results.totalStaffCost.toLocaleString()}`} accent={ACCENT} icon="cash-multiple" />
+        <MetricCard label="Cost per child" value={`Rs. ${costPerChild.toLocaleString()}`} subtitle="staff only" accent={ACCENT} icon="account-cash-outline" />
       </View>
 
-      {/* Age Group Sliders */}
-      <SectionTitle accent={ACCENT}>Children by Age Group</SectionTitle>
-      <EquationBox accent={ACCENT}>
-        Staff needed = ceil(children / ratio)  |  Staff cost = staff × rate × 48 weeks
-      </EquationBox>
-
-      {AGE_GROUPS.map((g) => (
-        <SliderRow
-          key={g.id}
-          label={g.label}
-          unit="children"
-          value={children[g.id]}
-          onChange={(v) => setChildren((prev) => ({ ...prev, [g.id]: v }))}
-          min={0}
-          max={20}
-          step={1}
-          accent={ACCENT}
-          suffix=""
-        />
-      ))}
-
-      {/* Staffing Summary */}
-      <View style={styles.grid2}>
-        {results.staffByGroup.map((g) => (
-          <MetricCard
-            key={g.id}
-            label={`${g.label.split('(')[0].trim()} Staff`}
-            value={`${g.staffNeeded} staff`}
-            subtitle={`Rs. ${g.staffCost.toLocaleString()}`}
-            accent={g.color}
+      <Section title="Enrolment" icon="baby-carriage" accent={ACCENT}>
+        {AGE_GROUPS.map((group) => (
+          <SliderRow
+            key={group.id}
+            plain
+            label={group.label}
+            unit="children"
+            value={planner.children[group.id] ?? 0}
+            onChange={(v) => setChild(group.id, v)}
+            min={group.min}
+            max={group.max}
+            step={1}
+            accent={group.color}
+            description={`Target ratio 1:${group.ratio}`}
           />
         ))}
-      </View>
-
-      {/* Marketing Channels */}
-      <SectionTitle accent={ACCENT}>Marketing Channels</SectionTitle>
-      {channels.map((c) => (
-        <CheckRow
-          key={c.id}
-          label={`${c.label} (${c.enrollments} enrollments)`}
-          checked={c.active}
-          onToggle={() => toggleChannel(c.id)}
-          value={c.cost}
-          onChangeValue={(val) => updateChannelCost(c.id, val)}
-          unit="Rs./mo"
+        <SliderRow
+          plain
+          label="Monthly staffing budget cap"
+          unit="Rs."
+          value={planner.lpBudgetCap}
+          onChange={(v) => planner.update({ lpBudgetCap: v })}
+          min={200000}
+          max={700000}
+          step={5000}
           accent={ACCENT}
+          formatValue={(value) => `Rs. ${value.toLocaleString()}`}
         />
-      ))}
+      </Section>
 
-      {/* Budget */}
-      <SliderRow
-        label="Monthly Staff Budget"
-        unit="Rs."
-        value={budget}
-        onChange={setBudget}
-        min={5000}
-        max={50000}
-        step={500}
-        accent={ACCENT}
-        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
-      />
+      <Section title="Role salaries" icon="account-tie-outline" accent={ACCENT}>
+        {roles.map((role) => (
+          <SliderRow
+            key={role.id}
+            plain
+            label={role.label}
+            unit="Rs./mo"
+            value={role.salary}
+            onChange={(value) => setSalary(role.id, value)}
+            min={15000}
+            max={80000}
+            step={1000}
+            accent={ACCENT}
+            description={role.note}
+            formatValue={(value) => `Rs. ${value.toLocaleString()}`}
+          />
+        ))}
+      </Section>
 
-      {/* Result */}
-      {results.overBudget ? (
-        <View style={styles.resultWarn}>
-          <Text style={styles.warnText}>
-            ⚠ Total cost (${results.totalCost.toLocaleString()}) exceeds budget (${budget.toLocaleString()}) 
-            by ${(results.totalCost - budget).toLocaleString()}. Reduce staffing or marketing.
-          </Text>
-        </View>
+      <Section title="Optimal staff allocation" icon="table" accent={ACCENT}>
+        <DataTable columns={['Role', 'Qty', 'Salary', 'Monthly cost']} rows={roleRows} flexes={[1.9, 0.55, 1.3, 1.45]} />
+      </Section>
+
+      <Section title="Constraints satisfied" icon="check-decagram-outline" accent={ACCENT}>
+        <ConstraintList items={constraints} />
+      </Section>
+
+      {results.totalStaffCost <= planner.lpBudgetCap ? (
+        <ResultBox type="ok">
+          Optimal staff cost Rs. {results.totalStaffCost.toLocaleString()}, leaving Rs. {(planner.lpBudgetCap - results.totalStaffCost).toLocaleString()} slack under cap.
+        </ResultBox>
       ) : (
-        <View style={styles.resultOk}>
-          <Text style={styles.okText}>
-            ✓ Total cost (${results.totalCost.toLocaleString()}) is within budget (${budget.toLocaleString()}).
-            Surplus: ${(budget - results.totalCost).toLocaleString()}
-          </Text>
-        </View>
+        <ResultBox type="warn">
+          Staff cost Rs. {results.totalStaffCost.toLocaleString()} exceeds cap by Rs. {(results.totalStaffCost - planner.lpBudgetCap).toLocaleString()}. Reduce salaries, lower age mix, or raise cap.
+        </ResultBox>
       )}
-
-      {/* Cost Breakdown */}
-      <SectionTitle accent={ACCENT}>Cost Breakdown</SectionTitle>
-      <StackedBar
-        segments={[results.totalStaffCost, results.mktCost]}
-        colors={[ACCENT, '#a8c4e0']}
-        labels={[`Staff: Rs. ${results.totalStaffCost.toLocaleString()}`, `Marketing: Rs. ${results.mktCost.toLocaleString()}`]}
-      />
-
-      {/* Roadmap */}
-      <SectionTitle accent={ACCENT}>Phase Roadmap</SectionTitle>
-      <PhaseRoadmap phases={ROADMAP} accent={ACCENT} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    padding: 26,
-  },
-  intro: {
-    fontSize: 13.5,
-    color: '#6b7178',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  grid2: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  grid3: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  resultOk: {
-    backgroundColor: '#eaf6ee',
-    borderRadius: 10,
-    padding: 13,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    borderWidth: 1.5,
-    borderColor: '#bfe2ca',
-  },
-  resultWarn: {
-    backgroundColor: '#fdf3e2',
-    borderRadius: 10,
-    padding: 13,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    borderWidth: 1.5,
-    borderColor: '#f0dcae',
-  },
-  okText: {
-    color: '#2f7a4f',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  warnText: {
-    color: '#a06a12',
-    fontSize: 13,
-    lineHeight: 20,
-  },
+  container: { flex: 1, backgroundColor: COLORS.backgroundPage },
+  content: { paddingHorizontal: 20, paddingTop: 4 },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
 });

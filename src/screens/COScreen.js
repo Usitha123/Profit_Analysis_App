@@ -1,289 +1,222 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, ScrollView, TextInput, StyleSheet, Platform,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { COLORS } from '../constants/theme';
-import { FIXED_COSTS, TUITION_RATE, ENROLMENT_CAPACITY } from '../constants/modelData';
+import {
+  CO_AGE_MIX, FIXED_COST_RANGES, PER_CHILD_COST_RANGES, STAFF_ROLES,
+} from '../constants/modelData';
+import { usePlanner } from '../context/PlannerContext';
 import MetricCard from '../components/MetricCard';
-import SliderRow from '../components/SliderRow';
-import { SectionTitle } from '../components/ResultBox';
+import SliderRow, { DualSlider } from '../components/SliderRow';
+import ResultBox from '../components/ResultBox';
+import Section from '../components/Section';
+import DataTable from '../components/DataTable';
 import GaugeBar from '../components/GaugeBar';
-import EquationBox from '../components/EquationBox';
 
 const ACCENT = COLORS.accentCO;
 
+function staffFloorForEnrolment(n) {
+  const infant = Math.round(n * CO_AGE_MIX.infant);
+  const toddler = Math.round(n * CO_AGE_MIX.toddler);
+  const preschool = Math.round(n * CO_AGE_MIX.preschool);
+  const schoolage = Math.max(0, n - infant - toddler - preschool);
+  const teachers = Math.ceil(preschool / 6) + Math.ceil(schoolage / 10);
+  const caretakers = Math.ceil(infant / 3);
+  const helpers = Math.ceil(toddler / 4);
+  return STAFF_ROLES.reduce((sum, role) => {
+    if (role.id === 'manager' || role.id === 'security') return sum + role.salary;
+    if (role.id === 'teacher') return sum + teachers * role.salary;
+    if (role.id === 'baby') return sum + caretakers * role.salary;
+    if (role.id === 'helper') return sum + helpers * role.salary;
+    return sum;
+  }, 0);
+}
+
+function scaleRanges(base, factor) {
+  return base.map((item) => ({ ...item, min: Math.round(item.min * factor), max: Math.round(item.max * factor) }));
+}
+
 export default function COScreen() {
   const insets = useSafeAreaInsets();
-  const [enrolment, setEnrolment] = useState(35);
-  const [tuition, setTuition] = useState(TUITION_RATE);
-  const [tenure, setTenure] = useState(60);
+  const planner = usePlanner();
+  const [autoNote, setAutoNote] = useState(null);
 
-  const [fixedCosts, setFixedCosts] = useState(
-    FIXED_COSTS.map((c) => ({ ...c }))
+  const enrolment = Math.max(10, planner.totalChildren || 10);
+
+  const fixedRanges = useMemo(
+    () => FIXED_COST_RANGES.map((meta) => {
+      const saved = (planner.coFixedRanges || []).find((r) => r.id === meta.id);
+      return { ...meta, min: saved?.min ?? meta.min, max: saved?.max ?? meta.max };
+    }),
+    [planner.coFixedRanges],
+  );
+  const perChildRanges = useMemo(
+    () => PER_CHILD_COST_RANGES.map((meta) => {
+      const saved = (planner.coPerChildRanges || []).find((r) => r.id === meta.id);
+      return { ...meta, min: saved?.min ?? meta.min, max: saved?.max ?? meta.max };
+    }),
+    [planner.coPerChildRanges],
   );
 
-  const [variableRange, setVariableRange] = useState({ min: 800, max: 2000 });
-  const [minInput, setMinInput] = useState('800');
-  const [maxInput, setMaxInput] = useState('2000');
-
-  const updateFixedCost = useCallback((id, val) => {
-    setFixedCosts((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, value: val } : c))
-    );
-  }, []);
-
-  const handleMinChange = (text) => {
-    setMinInput(text);
-    const val = Number(text);
-    if (!isNaN(val) && val >= 0) {
-      setVariableRange((p) => ({ ...p, min: val }));
-    }
-  };
-
-  const handleMaxChange = (text) => {
-    setMaxInput(text);
-    const val = Number(text);
-    if (!isNaN(val) && val >= 0) {
-      setVariableRange((p) => ({ ...p, max: val }));
-    }
-  };
-
-  const handleMinBlur = () => {
-    let val = Number(minInput);
-    if (isNaN(val) || val < 0) {
-      val = 0;
-    }
-    const maxVal = variableRange.max;
-    if (val > maxVal - 50) {
-      val = Math.max(0, maxVal - 50);
-    }
-    setVariableRange((p) => ({ ...p, min: val }));
-    setMinInput(String(val));
-  };
-
-  const handleMaxBlur = () => {
-    let val = Number(maxInput);
-    if (isNaN(val) || val < 0) {
-      val = 0;
-    }
-    const minVal = variableRange.min;
-    if (val < minVal + 50) {
-      val = minVal + 50;
-    }
-    setVariableRange((p) => ({ ...p, max: val }));
-    setMaxInput(String(val));
-  };
+  const staffFloor = useMemo(() => staffFloorForEnrolment(enrolment), [enrolment]);
 
   const results = useMemo(() => {
-    const totalFixed = fixedCosts.reduce((s, c) => s + c.value, 0);
-    const avgVarCost = (variableRange.min + variableRange.max) / 2;
-    const totalVariable = avgVarCost * enrolment;
-    const totalCost = totalFixed + totalVariable;
-    const revenue = enrolment * tuition;
-    const surplus = revenue - totalCost;
-    const costPerChild = enrolment > 0 ? totalCost / enrolment : 0;
-    const varCostPerChild = avgVarCost;
-    const totalBudget = totalFixed + 2000 * enrolment;
-
+    const fixedMin = fixedRanges.reduce((s, i) => s + i.min, 0);
+    const fixedMax = fixedRanges.reduce((s, i) => s + i.max, 0);
+    const pcMin = perChildRanges.reduce((s, i) => s + i.min, 0);
+    const pcMax = perChildRanges.reduce((s, i) => s + i.max, 0);
+    const totalMin = fixedMin + staffFloor + pcMin * enrolment;
+    const totalMax = fixedMax + staffFloor + pcMax * enrolment;
     return {
-      totalFixed,
-      avgVarCost,
-      totalVariable,
-      totalCost,
-      revenue,
-      surplus,
-      costPerChild,
-      varCostPerChild,
-      totalBudget,
-      costPct: totalBudget > 0 ? Math.round((totalCost / totalBudget) * 100) : 0,
+      totalMin, totalMax, perChildMin: pcMin, perChildMax: pcMax,
+      feasible: totalMin <= planner.coBudgetCap,
+      budgetGap: planner.coBudgetCap - totalMin,
     };
-  }, [fixedCosts, variableRange, enrolment, tuition]);
+  }, [planner.coBudgetCap, enrolment, fixedRanges, perChildRanges, staffFloor]);
+
+  const updateFixed = (id, lo, hi) => {
+    const next = fixedRanges.map((i) => (i.id === id ? { ...i, min: lo, max: hi } : i))
+      .map(({ id, min, max }) => ({ id, min, max }));
+    planner.update({ coFixedRanges: next });
+  };
+  const updatePerChild = (id, lo, hi) => {
+    const next = perChildRanges.map((i) => (i.id === id ? { ...i, min: lo, max: hi } : i))
+      .map(({ id, min, max }) => ({ id, min, max }));
+    planner.update({ coPerChildRanges: next });
+  };
+
+  const autoSuggest = () => {
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
+    const sizeFactor = Math.max(0.5, enrolment / 28);
+    planner.update({
+      coFixedRanges: scaleRanges(FIXED_COST_RANGES, sizeFactor).map(({ id, min, max }) => ({ id, min, max })),
+      coPerChildRanges: PER_CHILD_COST_RANGES.map(({ id, min, max }) => ({ id, min, max })),
+    });
+    setAutoNote(`Scaled ranges for n=${enrolment} using survey baseline at n=28.`);
+  };
+
+  // Amounts drop the "Rs." prefix - the column header carries the unit, which
+  // keeps each range on a single line at phone widths.
+  const tableRows = [
+    ...fixedRanges.map((i) => [i.label, `${i.min.toLocaleString()} - ${i.max.toLocaleString()}`, 'Fixed / month']),
+    ['Staff floor', staffFloor.toLocaleString(), `From LP at n=${enrolment}`],
+    ...perChildRanges.map((i) => [
+      i.label,
+      `${(i.min * enrolment).toLocaleString()} - ${(i.max * enrolment).toLocaleString()}`,
+      `${i.min}-${i.max}/child × ${enrolment}`,
+    ]),
+    ['Minimum feasible C*', results.totalMin.toLocaleString(), `At n=${enrolment}`],
+    ['Maximum plausible', results.totalMax.toLocaleString(), 'Upper end of ranges'],
+  ];
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.intro}>
-        Balance fixed and variable costs to optimise your daycare's cost structure.
-        Adjust enrolment, tuition fees, and expense items below.
-      </Text>
-
-      {/* Metrics */}
-      <View style={styles.grid3}>
-        <MetricCard label="Total Cost" value={`Rs. ${results.totalCost.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard
-          label="Surplus"
-          value={`Rs. ${results.surplus.toLocaleString()}`}
-          accent={results.surplus >= 0 ? ACCENT : COLORS.accentRed}
-          subtitle={results.surplus >= 0 ? 'Profitable' : 'Loss'}
-        />
-        <MetricCard label="Cost / Child" value={`Rs. ${Math.round(results.costPerChild)}`} accent={ACCENT} />
-        <MetricCard label="Fixed Costs" value={`Rs. ${results.totalFixed.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Variable Costs" value={`Rs. ${results.totalVariable.toLocaleString()}`} accent={ACCENT} />
+      <View style={styles.linkBanner}>
+        <Text style={styles.linkBannerText}>
+          Enrolment linked to Staffing tab: <Text style={styles.linkBannerNum}>n = {enrolment}</Text>
+        </Text>
       </View>
 
-      {/* Gauge */}
-      <SectionTitle accent={ACCENT}>Budget Utilisation</SectionTitle>
-      <GaugeBar
-        label="Cost vs Budget"
-        value={results.totalCost}
-        max={results.totalBudget}
-        accent={ACCENT}
-        format={(v) => `${Math.round((v / results.totalBudget) * 100)}%`}
-      />
+      <View style={styles.metrics}>
+        <MetricCard label="Children (n)" value={enrolment} accent={ACCENT} icon="account-multiple" subtitle="from Staffing tab" />
+        <MetricCard label="Per-child subtotal" value={`Rs. ${results.perChildMin.toLocaleString()}-${results.perChildMax.toLocaleString()}`} accent={ACCENT} icon="cash-multiple" />
+        <MetricCard label="Minimum feasible" value={`Rs. ${results.totalMin.toLocaleString()}`} subtitle={`Cap Rs. ${planner.coBudgetCap.toLocaleString()}`} accent={results.feasible ? ACCENT : COLORS.accentRed} icon="arrow-down-bold-outline" />
+        <MetricCard label="Max plausible" value={`Rs. ${results.totalMax.toLocaleString()}`} accent={ACCENT} icon="arrow-up-bold-outline" />
+      </View>
 
-      {/* Key Drivers */}
-      <SectionTitle accent={ACCENT}>Key Drivers</SectionTitle>
-      <EquationBox accent={ACCENT}>
-        Total Cost = Fixed Costs + (Avg Variable Cost × Enrolment)
-      </EquationBox>
+      <Section title="Budget cap" icon="cash-multiple" accent={ACCENT}>
+        <SliderRow plain label="Monthly budget cap" unit="Rs." value={planner.coBudgetCap}
+          onChange={(v) => planner.update({ coBudgetCap: v })}
+          min={200000} max={1500000} step={10000} accent={ACCENT}
+          formatValue={(v) => `Rs. ${v.toLocaleString()}`} />
+      </Section>
 
-      <SliderRow
-        label="Enrolment"
-        unit="children"
-        value={enrolment}
-        onChange={setEnrolment}
-        min={5}
-        max={ENROLMENT_CAPACITY}
-        step={1}
-        accent={ACCENT}
-      />
-
-      <SliderRow
-        label="Tuition Fee"
-        unit="Rs./mo"
-        value={tuition}
-        onChange={setTuition}
-        min={500}
-        max={2000}
-        step={25}
-        accent={ACCENT}
-        formatValue={(v) => `Rs. ${v}`}
-      />
-
-      <SliderRow
-        label="Avg Tenure"
-        unit="months"
-        value={tenure}
-        onChange={setTenure}
-        min={6}
-        max={48}
-        step={1}
-        accent={ACCENT}
-        formatValue={(v) => `${v} mo`}
-      />
-
-      {/* Variable Cost Range */}
-      <SectionTitle accent={ACCENT}>Variable Cost per Child</SectionTitle>
-      <Text style={styles.note}>
-        Set the range of monthly variable costs per enrolled child (supplies, meals, activities).
-      </Text>
-      <View style={styles.dualRow}>
-        <Text style={styles.dualLabel}>Range</Text>
-        <View style={styles.dualInputs}>
-          <TextInput
-            style={[styles.dualInput, { color: ACCENT }]}
-            value={minInput}
-            onChangeText={handleMinChange}
-            onBlur={handleMinBlur}
-            keyboardType="numeric"
+      <Section title="Fixed monthly ranges" icon="home-outline" accent={ACCENT}>
+        {fixedRanges.map((item) => (
+          <DualSlider
+            key={item.id}
+            plain
+            label={item.label}
+            value1={item.min}
+            value2={item.max}
+            onChange1={(v) => updateFixed(item.id, v, item.max)}
+            onChange2={(v) => updateFixed(item.id, item.min, v)}
+            min={0} max={300000} step={2500}
+            accent={ACCENT}
+            description="Drag both ends of the range"
           />
-          <Text style={styles.dualSep}>–</Text>
-          <TextInput
-            style={[styles.dualInput, { color: ACCENT }]}
-            value={maxInput}
-            onChangeText={handleMaxChange}
-            onBlur={handleMaxBlur}
-            keyboardType="numeric"
+        ))}
+      </Section>
+
+      <Section title="Per-child ranges" icon="baby-face-outline" accent={ACCENT}>
+        {perChildRanges.map((item) => (
+          <DualSlider
+            key={item.id}
+            plain
+            label={item.label}
+            value1={item.min}
+            value2={item.max}
+            onChange1={(v) => updatePerChild(item.id, v, item.max)}
+            onChange2={(v) => updatePerChild(item.id, item.min, v)}
+            min={0} max={2500} step={25}
+            accent={ACCENT}
+            description="Per child per month"
           />
+        ))}
+        <TouchableOpacity onPress={autoSuggest} style={[styles.button, { borderColor: ACCENT }]} activeOpacity={0.8}>
+          <Text style={[styles.buttonText, { color: ACCENT }]}>Auto-suggest starter ranges</Text>
+        </TouchableOpacity>
+        {autoNote ? <Text style={styles.autoNote}>{autoNote}</Text> : null}
+      </Section>
+
+      <Section title="Budget utilisation" icon="gauge" accent={ACCENT}>
+        <View style={{ paddingVertical: 8 }}>
+          <GaugeBar label="Minimum required" value={results.totalMin} max={Math.max(results.totalMax, planner.coBudgetCap)}
+            accent={results.feasible ? ACCENT : COLORS.accentRed}
+            format={() => `Rs. ${results.totalMin.toLocaleString()}`} />
+          <GaugeBar label="Your budget cap" value={planner.coBudgetCap} max={Math.max(results.totalMax, planner.coBudgetCap)}
+            accent={COLORS.accentGR} format={() => `Rs. ${planner.coBudgetCap.toLocaleString()}`} />
+          <GaugeBar label="Maximum plausible" value={results.totalMax} max={Math.max(results.totalMax, planner.coBudgetCap)}
+            accent={COLORS.accentPF} format={() => `Rs. ${results.totalMax.toLocaleString()}`} />
         </View>
-      </View>
+      </Section>
 
-      {/* Fixed Costs */}
-      <SectionTitle accent={ACCENT}>Fixed Costs</SectionTitle>
-      {fixedCosts.map((c) => (
-        <SliderRow
-          key={c.id}
-          label={c.label}
-          unit="Rs./mo"
-          value={c.value}
-          onChange={(v) => updateFixedCost(c.id, v)}
-          min={0}
-          max={10000}
-          step={50}
-          accent={ACCENT}
-          formatValue={(v) => `Rs. ${v.toLocaleString()}`}
-        />
-      ))}
+      {results.feasible ? (
+        <ResultBox type="ok">
+          Feasible. Minimum allocation Rs. {results.totalMin.toLocaleString()}/mo leaves Rs. {results.budgetGap.toLocaleString()} slack under cap.
+        </ResultBox>
+      ) : (
+        <ResultBox type="warn">
+          Infeasible. Even the minimum allocation Rs. {results.totalMin.toLocaleString()} exceeds cap by Rs. {Math.abs(results.budgetGap).toLocaleString()}.
+        </ResultBox>
+      )}
+
+      <Section title="Allocation summary" icon="table" accent={ACCENT} defaultOpen={false}>
+        <DataTable columns={['Category', 'Monthly range (Rs.)', 'Source']} rows={tableRows} flexes={[1.25, 1.5, 1.25]} />
+      </Section>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  container: { flex: 1, backgroundColor: COLORS.backgroundPage },
+  content: { paddingHorizontal: 20, paddingTop: 4 },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  button: {
+    marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: '#fff',
   },
-  content: {
-    padding: 26,
+  buttonText: { fontSize: 13.5, fontWeight: '700' },
+  autoNote: { marginTop: 8, fontSize: 12, color: '#6b7178', fontStyle: 'italic' },
+  linkBanner: {
+    backgroundColor: `${ACCENT}12`,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 12,
   },
-  intro: {
-    fontSize: 13.5,
-    color: '#6b7178',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  grid3: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  note: {
-    fontSize: 12,
-    color: '#6b7178',
-    lineHeight: 20,
-    marginBottom: 8,
-    paddingLeft: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: '#e6e0d0',
-  },
-  dualRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  dualLabel: {
-    fontSize: 13,
-    color: '#6b7178',
-    minWidth: 60,
-  },
-  dualInputs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  dualInput: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    fontSize: 12,
-    fontWeight: '700',
-    backgroundColor: 'rgba(47,143,131,0.08)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    textAlign: 'right',
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  dualSep: {
-    color: '#6b7178',
-    fontSize: 12,
-  },
+  linkBannerText: { fontSize: 12, color: COLORS.textSecondary },
+  linkBannerNum: { fontWeight: '800', color: ACCENT },
 });

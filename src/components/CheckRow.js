@@ -9,45 +9,66 @@ export default function CheckRow({
   onChangeValue,
   unit,
   accent = '#3d6ea5',
+  plain = false,
 }) {
   return (
-    <View style={styles.row}>
-      <Switch
-        value={checked}
-        onValueChange={onToggle}
-        trackColor={{ false: '#e6e0d0', true: `${accent}66` }}
-        thumbColor={checked ? accent : '#f4f3f4'}
-        style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-      />
-      <Text style={styles.label}>{label}</Text>
-      {value !== undefined && (
-        <>
+    <View style={[styles.row, plain && styles.rowPlain]}>
+      <View style={styles.head}>
+        <Switch
+          value={checked}
+          onValueChange={onToggle}
+          trackColor={{ false: '#e6e0d0', true: `${accent}66` }}
+          thumbColor={checked ? accent : '#f4f3f4'}
+          ios_backgroundColor="#e6e0d0"
+        />
+        <Text style={styles.label}>{label}</Text>
+      </View>
+      {value !== undefined ? (
+        <View style={styles.tail}>
           <TextInput
             style={styles.input}
             value={String(value)}
             onChangeText={(t) => {
-              if (onChangeValue) {
-                onChangeValue(Number(t) || 0);
-              }
+              if (onChangeValue) onChangeValue(Number(t) || 0);
             }}
             keyboardType="numeric"
           />
           {unit ? <Text style={styles.unit}>{unit}</Text> : null}
-        </>
-      )}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
+    gap: 10,
+    marginBottom: 12,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  rowPlain: {
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    marginBottom: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eef0f3',
+  },
+  head: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 9,
+    minHeight: 44,
+  },
+  tail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 48,
   },
   label: {
     fontSize: 13,
+    lineHeight: 18,
     color: '#232a2e',
     flex: 1,
   },
@@ -55,13 +76,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#d8d1bf',
     borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    fontSize: 13,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
     color: '#232a2e',
     backgroundColor: '#fff',
-    width: 80,
+    width: 100,
+    minHeight: 40,
     textAlign: 'right',
   },
   unit: {

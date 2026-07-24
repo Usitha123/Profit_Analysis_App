@@ -1,440 +1,306 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, StyleSheet, Dimensions, Platform,
+  View, Text, ScrollView, TextInput, StyleSheet, Dimensions, Platform, Pressable, Alert,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { exportPlannerReport } from '../utils/report';
 import Svg, { Line, Rect, Text as SvgText, G, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { DEP_ASSETS, TUITION_RATE, ENROLMENT_CAPACITY } from '../constants/modelData';
+import { DEP_ASSETS, NON_DEPRECIABLE_OUTLAY } from '../constants/modelData';
+import { usePlanner } from '../context/PlannerContext';
 import MetricCard from '../components/MetricCard';
-import SliderRow from '../components/SliderRow';
-import { SectionTitle } from '../components/ResultBox';
-import EquationBox from '../components/EquationBox';
-import { StackedBar } from '../components/GaugeBar';
+import ResultBox from '../components/ResultBox';
+import Section from '../components/Section';
+import DonutChart from '../components/DonutChart';
+// import PhaseRoadmap from '../components/PhaseRoadmap'; // roadmap section hidden this release
+
+const { calculateProfit } = require('../utils/calculations');
 
 const ACCENT = COLORS.accentPF;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// Guard any computed number against NaN/Infinity before use in SVG or toLocaleString
-const safeNum = (n, fallback = 0) =>
-  typeof n === 'number' && isFinite(n) && !isNaN(n) ? n : fallback;
+function formatCurrencyShort(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${Math.round(n / 1000)}k`;
+  return String(Math.round(n));
+}
 
 export default function PFScreen() {
   const insets = useSafeAreaInsets();
-  const [enrolment, setEnrolment] = useState(40);
-  const [tuition, setTuition] = useState(TUITION_RATE);
-  const [operatingCosts, setOperatingCosts] = useState(18000);
+  const planner = usePlanner();
+  const enrolment = Math.max(1, planner.totalChildren || 1);
+  const [exporting, setExporting] = useState(false);
 
-  const [assets, setAssets] = useState(
-    DEP_ASSETS.map((a) => ({ ...a, cost: String(a.cost), life: String(a.life) }))
-  );
-
-  const updateAsset = (id, field, val) => {
-    setAssets((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, [field]: val } : a))
-    );
+  const handleExport = async () => {
+    if (exporting) return;
+    try {
+      setExporting(true);
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
+      await exportPlannerReport(planner);
+    } catch (e) {
+      Alert.alert('Export failed', String(e?.message || e));
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const results = useMemo(() => {
-    const revenue = enrolment * tuition;
-    const totalDepreciation = assets.reduce((s, a) => {
-      const cost = Number(a.cost) || 0;
-      const life = Number(a.life) || 0;
-      const annualDep = life > 0 ? cost / life : cost;
-      return s + annualDep / 12;
-    }, 0);
-    const ebitda = revenue - operatingCosts;
-    const netProfit = ebitda - totalDepreciation;
-    const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-    const totalInvestment = assets.reduce((s, a) => s + (Number(a.cost) || 0), 0);
-    const roi = totalInvestment > 0 ? (netProfit * 12 / totalInvestment) * 100 : 0;
+  const assets = useMemo(
+    () => DEP_ASSETS.map((meta) => {
+      const saved = (planner.pfAssets || []).find((a) => a.id === meta.id);
+      return { ...meta, cost: saved?.cost ?? meta.cost, life: saved?.life ?? meta.life };
+    }),
+    [planner.pfAssets],
+  );
 
-    // Projection data (12 months)
-    const projection = [];
-    for (let m = 1; m <= 12; m++) {
-      const growthFactor = 1 + (m - 1) * 0.02;
-      const mRevenue = revenue * growthFactor;
-      const mCosts = operatingCosts * growthFactor;
-      const mEbitda = mRevenue - mCosts;
-      const mNet = mEbitda - totalDepreciation;
-      projection.push({
-        month: m,
-        revenue: Math.round(mRevenue),
-        costs: Math.round(mCosts),
-        ebitda: Math.round(mEbitda),
-        net: Math.round(mNet),
-      });
-    }
+  const results = useMemo(() => calculateProfit({
+    enrolment,
+    tuition: planner.effectiveFee,
+    fixedCost: planner.fixedCost,
+    variableCostPerChild: planner.variableCost,
+    assets,
+    nonDepreciable: NON_DEPRECIABLE_OUTLAY,
+  }), [enrolment, planner.effectiveFee, planner.fixedCost, planner.variableCost, assets]);
 
-    const assetLabels = assets.map((a) => a.label.split('(')[0].trim());
-    const assetValues = assets.map((a) => Number(a.cost) || 0);
-    const assetColors = ['#5b9bd5', '#70ad47', '#ffc000', '#ed7d31', '#8a4a86', '#3d6ea5'];
+  const updateAsset = (id, field, value) => {
+    const next = assets.map((a) => (a.id === id ? { ...a, [field]: Number(value) || 0 } : a))
+      .map(({ id, cost, life }) => ({ id, cost, life }));
+    planner.update({ pfAssets: next });
+  };
 
-    return {
-      revenue,
-      totalDepreciation,
-      ebitda,
-      netProfit,
-      profitMargin,
-      totalInvestment,
-      roi,
-      projection,
-      assetLabels,
-      assetValues,
-      assetColors,
-    };
-  }, [enrolment, tuition, operatingCosts, assets]);
-
-  // Chart
-  const chartW = Math.min(SCREEN_WIDTH - 76, 400);
-  const chartH = 240;
-  const pad = { top: 20, right: 10, bottom: 30, left: 55 };
+  const chartW = Math.min(SCREEN_WIDTH - 68, 420);
+  const chartH = 260;
+  const pad = { top: 16, right: 14, bottom: 42, left: 60 };
   const plotW = chartW - pad.left - pad.right;
   const plotH = chartH - pad.top - pad.bottom;
-
-  const maxChartVal = Math.max(
-    ...results.projection.map((d) => Math.max(safeNum(d.revenue), safeNum(d.net) + safeNum(d.costs))),
-    1
-  );
-
-  const toX = (m) => {
-    const x = pad.left + ((m - 1) / 11) * plotW;
-    return safeNum(x, pad.left);
-  };
-  const toY = (v) => {
-    const y = pad.top + plotH - (safeNum(v) / maxChartVal) * plotH;
-    return safeNum(y, pad.top + plotH);
-  };
-
-  const revPts = results.projection.map((d) => `${toX(d.month)},${toY(d.revenue)}`).join(' ');
-  const netPts = results.projection.map((d) => `${toX(d.month)},${toY(d.net)}`).join(' ');
+  const maxX = 100;
+  const netPts = [];
+  for (let n = 0; n <= maxX; n += 5) {
+    const net = planner.effectiveFee * n - (planner.fixedCost + planner.variableCost * n) - results.totalDepreciation;
+    netPts.push({ x: n, net });
+  }
+  const maxAbs = Math.max(1, ...netPts.map((p) => Math.abs(p.net)));
+  const toX = (v) => pad.left + (v / maxX) * plotW;
+  const toY = (v) => pad.top + plotH / 2 - (v / maxAbs) * (plotH / 2);
+  const zeroY = toY(0);
+  const netPointsStr = netPts.map((p) => `${toX(p.x)},${toY(p.net)}`).join(' ');
+  const cashBep = Number.isFinite(planner.breakevenUnits) ? Math.ceil(planner.breakevenUnits) : null;
+  const accBep = Number.isFinite(results.accountingBreakevenUnits) ? results.accountingBreakevenUnits : null;
+  const xTicks = [0, 25, 50, 75, 100];
+  const yTicksVals = [-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs];
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.intro}>
-        Analyse profitability, depreciation, and return on investment.
-        Manage capital assets, operating costs, and revenue projections.
-      </Text>
-
-      {/* Key Metrics */}
-      <View style={styles.grid3}>
-        <MetricCard label="Monthly Revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="EBITDA" value={`Rs. ${Math.round(results.ebitda).toLocaleString()}`} accent={ACCENT} subtitle="Earnings before depreciation" />
-        <MetricCard label="Net Profit" value={`Rs. ${Math.round(results.netProfit).toLocaleString()}`} accent={results.netProfit >= 0 ? ACCENT : COLORS.accentRed} />
-        <MetricCard label="Profit Margin" value={`${results.profitMargin.toFixed(1)}%`} accent={results.profitMargin >= 0 ? ACCENT : COLORS.accentRed} />
-        <MetricCard label="Total Investment" value={`Rs. ${results.totalInvestment.toLocaleString()}`} accent={ACCENT} />
-        <MetricCard label="Annual ROI" value={`${results.roi.toFixed(1)}%`} accent={results.roi >= 0 ? ACCENT : COLORS.accentRed} />
+      <View style={styles.linkBanner}>
+        <Text style={styles.linkBannerText}>
+          Enrolment linked to Staffing tab: <Text style={styles.linkBannerNum}>n = {enrolment}</Text>
+        </Text>
       </View>
 
-      {/* Inputs */}
-      <SectionTitle accent={ACCENT}>Key Drivers</SectionTitle>
-      <EquationBox accent={ACCENT}>
-        Net Profit = Revenue − Operating Costs − Depreciation{'\n'}
-        ROI = (Annual Net Profit / Total Investment) × 100
-      </EquationBox>
-
-      <SliderRow
-        label="Enrolment"
-        unit="children"
-        value={enrolment}
-        onChange={setEnrolment}
-        min={5}
-        max={ENROLMENT_CAPACITY}
-        step={1}
-        accent={ACCENT}
-      />
-
-      <SliderRow
-        label="Tuition Fee"
-        unit="Rs./mo"
-        value={tuition}
-        onChange={setTuition}
-        min={500}
-        max={2000}
-        step={25}
-        accent={ACCENT}
-        formatValue={(v) => `Rs. ${v}`}
-      />
-
-      <SliderRow
-        label="Operating Costs"
-        unit="Rs./mo"
-        value={operatingCosts}
-        onChange={setOperatingCosts}
-        min={5000}
-        max={50000}
-        step={500}
-        accent={ACCENT}
-        formatValue={(v) => `Rs. ${v.toLocaleString()}`}
-      />
-
-      {/* Capital Assets & Depreciation */}
-      <SectionTitle accent={ACCENT}>Capital Assets & Depreciation</SectionTitle>
-      <Text style={styles.note}>
-        Each asset's monthly depreciation = (asset cost) / (useful life × 12 months).
-        Changing the cost or life updates the depreciation schedule.
-      </Text>
-
-      <View style={styles.assetTable}>
-        <View style={styles.assetHeader}>
-          <Text style={[styles.assetHeaderCell, { flex: 2 }]}>Asset</Text>
-          <Text style={styles.assetHeaderCell}>Cost</Text>
-          <Text style={styles.assetHeaderCell}>Life (yr)</Text>
-          <Text style={[styles.assetHeaderCell, { textAlign: 'right' }]}>Depr/mo</Text>
-        </View>
-        {assets.map((a) => {
-          const cost = Number(a.cost) || 0;
-          const life = Number(a.life) || 0;
-          const monthlyDep = life > 0 ? (cost / (life * 12)) : cost;
-          return (
-            <View key={a.id} style={styles.assetRow}>
-              <Text style={[styles.assetCell, { flex: 2 }]}>{a.label}</Text>
-              <TextInput
-                style={styles.assetInput}
-                value={a.cost}
-                onChangeText={(t) => updateAsset(a.id, 'cost', t)}
-                keyboardType="numeric"
-                placeholderTextColor="#6b7178"
-              />
-              <TextInput
-                style={[styles.assetInput, { width: 44 }]}
-                value={a.life}
-                onChangeText={(t) => updateAsset(a.id, 'life', t)}
-                keyboardType="numeric"
-                placeholderTextColor="#6b7178"
-              />
-              <Text style={styles.assetVal}>
-                Rs. {Math.round(monthlyDep).toLocaleString()}
-              </Text>
-            </View>
-          );
-        })}
-        <View style={[styles.assetRow, styles.assetTotal]}>
-          <Text style={[styles.assetCell, { flex: 2, fontWeight: '700' }]}>Total</Text>
-          <Text style={styles.assetVal}>
-            Rs. {assets.reduce((s, a) => s + (Number(a.cost) || 0), 0).toLocaleString()}
-          </Text>
-          <Text style={styles.assetVal}></Text>
-          <Text style={[styles.assetVal, { fontWeight: '700' }]}>
-            Rs. {Math.round(results.totalDepreciation).toLocaleString()}
-          </Text>
-        </View>
+      <View style={styles.metrics}>
+        <MetricCard label="Revenue" value={`Rs. ${results.revenue.toLocaleString()}`} accent={ACCENT} icon="cash-plus" />
+        <MetricCard label="Operating cost" value={`Rs. ${Math.round(results.operatingCost).toLocaleString()}`} accent={ACCENT} icon="cash-minus" />
+        <MetricCard label="EBITDA" value={`Rs. ${Math.round(results.ebitda).toLocaleString()}`} accent={results.ebitda >= 0 ? ACCENT : COLORS.accentRed} icon="chart-bar" trend={results.ebitda >= 0 ? 'up' : 'down'} />
+        <MetricCard label="Monthly deprec." value={`Rs. ${Math.round(results.totalDepreciation).toLocaleString()}`} accent={ACCENT} icon="trending-down" />
+        <MetricCard label="Net profit" value={`Rs. ${Math.round(results.netProfit).toLocaleString()}`} subtitle="after depreciation" accent={results.netProfit >= 0 ? ACCENT : COLORS.accentRed} icon="cash-100" trend={results.netProfit >= 0 ? 'up' : 'down'} />
+        <MetricCard label="Total capex" value={`Rs. ${results.totalCapex.toLocaleString()}`} accent={ACCENT} icon="bank-outline" />
+        <MetricCard label="Cash BE" value={cashBep ? `${cashBep} children` : '—'} accent={ACCENT} icon="chart-line-variant" />
+        <MetricCard label="Accounting BE" value={accBep && Number.isFinite(accBep) ? `${accBep} children` : '—'} subtitle="incl. depreciation" accent={ACCENT} icon="chart-timeline-variant" />
+        <MetricCard label="Payback" value={Number.isFinite(results.paybackMonths) ? `${results.paybackMonths.toFixed(1)} mo` : 'Not reached'} accent={ACCENT} icon="clock-outline" />
+        <MetricCard label="Annual ROI" value={`${results.roi.toFixed(1)}%`} accent={results.roi >= 0 ? ACCENT : COLORS.accentRed} icon="percent-outline" trend={results.roi >= 0 ? 'up' : 'down'} />
       </View>
 
-      {/* Asset Allocation */}
-      <SectionTitle accent={ACCENT}>Capital Allocation</SectionTitle>
-      <StackedBar
-        segments={results.assetValues}
-        colors={results.assetColors}
-        labels={results.assetLabels}
-      />
-
-      {/* 12-Month Projection Chart */}
-      <SectionTitle accent={ACCENT}>12-Month Financial Projection</SectionTitle>
-      <View style={styles.chartContainer}>
-        <Svg width={chartW} height={chartH}>
-          <SvgText x={8} y={12} fontSize={9} fill="#6b7178" textAnchor="start">
-            Rs.
-          </SvgText>
-
-          {[0, 0.25, 0.5, 0.75, 1].map((r) => (
-            <Line
-              key={r}
-              x1={pad.left}
-              y1={pad.top + plotH * (1 - r)}
-              x2={chartW - pad.right}
-              y2={pad.top + plotH * (1 - r)}
-              stroke="#eee9dc"
-              strokeWidth={1}
-              strokeDasharray="4,4"
-            />
-          ))}
-
-          <Polyline points={revPts} fill="none" stroke={COLORS.accentLP} strokeWidth={2.5} />
-          <Polyline points={netPts} fill="none" stroke={ACCENT} strokeWidth={2.5} />
-
-          {[1, 4, 7, 10, 12].map((m) => (
-            <SvgText
-              key={m}
-              x={toX(m)}
-              y={chartH - 4}
-              fontSize={8}
-              fill="#6b7178"
-              textAnchor="middle"
-            >
-              M{m}
-            </SvgText>
-          ))}
-
-          <G x={chartW - 140} y={8}>
-            <Rect x={0} y={0} width={10} height={3} rx={1.5} fill={COLORS.accentLP} />
-            <SvgText x={15} y={4} fontSize={9} fill="#6b7178">Revenue</SvgText>
-            <Rect x={70} y={0} width={10} height={3} rx={1.5} fill={ACCENT} />
-            <SvgText x={85} y={4} fontSize={9} fill="#6b7178">Net Profit</SvgText>
-          </G>
-        </Svg>
-      </View>
-
-      {/* Monthly projection table */}
-      <SectionTitle accent={ACCENT}>Monthly Summary</SectionTitle>
-      <View style={styles.table}>
-        <View style={styles.tableHeader}>
-          {['Month', 'Revenue', 'Costs', 'EBITDA', 'Net'].map((h) => (
-            <Text key={h} style={styles.th}>{h}</Text>
-          ))}
+      <Section title="Capital assets and depreciation" icon="warehouse" accent={ACCENT}>
+        <View style={styles.assetTable}>
+          <View style={styles.assetHeader}>
+            <Text style={[styles.assetHeaderCell, { flex: 2.1 }]}>Asset</Text>
+            <Text style={[styles.assetHeaderCell, styles.assetHeaderCost]}>Cost</Text>
+            <Text style={[styles.assetHeaderCell, styles.assetHeaderLife]}>Life (yr)</Text>
+            <Text style={[styles.assetHeaderCell, styles.assetHeaderDep]}>Dep./mo</Text>
+          </View>
+          {assets.map((a) => {
+            const monthlyDep = a.life > 0 ? a.cost / (a.life * 12) : a.cost;
+            return (
+              <View key={a.id} style={styles.assetRow}>
+                <Text style={[styles.assetCell, { flex: 2.1 }]}>{a.label}</Text>
+                <TextInput
+                  style={styles.assetInput}
+                  value={String(a.cost)}
+                  onChangeText={(v) => updateAsset(a.id, 'cost', v)}
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={[styles.assetInput, styles.lifeInput]}
+                  value={String(a.life)}
+                  onChangeText={(v) => updateAsset(a.id, 'life', v)}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.assetValue}>Rs. {Math.round(monthlyDep).toLocaleString()}</Text>
+              </View>
+            );
+          })}
         </View>
-        {results.projection.map((d) => (
-          <View key={d.month} style={styles.tr}>
-            <Text style={styles.td}>{d.month}</Text>
-            <Text style={styles.td}>Rs. {d.revenue.toLocaleString()}</Text>
-            <Text style={styles.td}>Rs. {d.costs.toLocaleString()}</Text>
-            <Text style={[styles.td, { color: d.ebitda >= 0 ? COLORS.textSuccess : COLORS.accentRed }]}>
-              Rs. {d.ebitda.toLocaleString()}
-            </Text>
-            <Text style={[styles.td, { color: d.net >= 0 ? COLORS.textSuccess : COLORS.accentRed }]}>
-              Rs. {d.net.toLocaleString()}
-            </Text>
+      </Section>
+
+      <Section title="One-off non-depreciable capital outlay" icon="file-document-outline" accent={ACCENT} defaultOpen={false}>
+        {NON_DEPRECIABLE_OUTLAY.map((it) => (
+          <View key={it.id} style={styles.nonDepRow}>
+            <Text style={styles.nonDepLabel}>{it.label}</Text>
+            <Text style={styles.nonDepValue}>Rs. {it.cost.toLocaleString()}</Text>
           </View>
         ))}
-      </View>
+        <View style={[styles.nonDepRow, styles.totalRow]}>
+          <Text style={[styles.nonDepLabel, styles.totalText]}>Total non-depreciable</Text>
+          <Text style={[styles.nonDepValue, styles.totalText]}>Rs. {results.totalNonDepreciableOutlay.toLocaleString()}</Text>
+        </View>
+      </Section>
+
+      {results.netProfit >= 0 ? (
+        <ResultBox type="ok">
+          Net profit after depreciation is Rs. {Math.round(results.netProfit).toLocaleString()}/mo.
+          {Number.isFinite(results.paybackMonths) ? ` Payback ~ ${results.paybackMonths.toFixed(1)} months. Annual ROI ${results.roi.toFixed(1)}%.` : ''}
+        </ResultBox>
+      ) : (
+        <ResultBox type="warn">
+          Net profit negative after depreciation. Raise enrolment (Staffing tab), raise fee, or lower operating cost.
+        </ResultBox>
+      )}
+
+      <Section title="Capital allocation" icon="chart-donut" accent={ACCENT} defaultOpen={false}>
+        <DonutChart
+          segments={assets.map((a) => a.cost)}
+          labels={assets.map((a) => a.label)}
+          centerCaption="Depreciable capex"
+        />
+      </Section>
+
+      <Section title="Net profit vs enrolment" icon="chart-areaspline" accent={ACCENT}>
+        <View style={styles.chartContainer}>
+          <Svg width={chartW} height={chartH}>
+            {yTicksVals.map((tick, i) => {
+              const y = toY(tick);
+              return (
+                <G key={`y-${i}`}>
+                  <Line x1={pad.left} y1={y} x2={chartW - pad.right} y2={y} stroke="#eef0f3" strokeWidth={1} />
+                  <SvgText x={pad.left - 6} y={y + 3} fontSize={9} fill={COLORS.textMuted} textAnchor="end">{formatCurrencyShort(tick)}</SvgText>
+                </G>
+              );
+            })}
+            {xTicks.map((tick, i) => (
+              <SvgText key={`x-${i}`} x={toX(tick)} y={pad.top + plotH + 16} fontSize={9} fill={COLORS.textMuted} textAnchor="middle">{tick}</SvgText>
+            ))}
+            <SvgText x={pad.left + plotW / 2} y={chartH - 4} fontSize={10} fill={COLORS.textSecondary} fontWeight="600" textAnchor="middle">Children (n)</SvgText>
+            <SvgText x={12} y={pad.top + plotH / 2} fontSize={10} fill={COLORS.textSecondary} fontWeight="600" textAnchor="middle" transform={`rotate(-90, 12, ${pad.top + plotH / 2})`}>Net profit (Rs.)</SvgText>
+
+            <Line x1={pad.left} y1={zeroY} x2={chartW - pad.right} y2={zeroY} stroke="#6b7280" strokeWidth={1} />
+            {cashBep ? (
+              <Line x1={toX(cashBep)} y1={pad.top} x2={toX(cashBep)} y2={pad.top + plotH} stroke={COLORS.accentBE} strokeDasharray="4,3" strokeWidth={1.3} />
+            ) : null}
+            {accBep && Number.isFinite(accBep) && accBep <= maxX ? (
+              <Line x1={toX(accBep)} y1={pad.top} x2={toX(accBep)} y2={pad.top + plotH} stroke={ACCENT} strokeDasharray="4,3" strokeWidth={1.3} />
+            ) : null}
+            <Polyline points={netPointsStr} fill="none" stroke={ACCENT} strokeWidth={2.5} />
+            <G x={chartW - 190} y={4}>
+              <Rect x={0} y={0} width={10} height={3} rx={1.5} fill={ACCENT} />
+              <SvgText x={15} y={4} fontSize={9} fill={COLORS.textSecondary}>Net profit</SvgText>
+              <Rect x={64} y={0} width={10} height={3} rx={1.5} fill={COLORS.accentBE} />
+              <SvgText x={79} y={4} fontSize={9} fill={COLORS.textSecondary}>Cash BE</SvgText>
+              <Rect x={124} y={0} width={10} height={3} rx={1.5} fill={ACCENT} />
+              <SvgText x={139} y={4} fontSize={9} fill={COLORS.textSecondary}>Acc. BE</SvgText>
+            </G>
+          </Svg>
+        </View>
+      </Section>
+
+      {/* Phase roadmap hidden for this release. To restore, re-enable the ROADMAP
+          and PhaseRoadmap imports above and uncomment this block.
+      <Section title="Phase roadmap" icon="road-variant" accent={ACCENT} defaultOpen={false}>
+        <PhaseRoadmap phases={ROADMAP} accent={ACCENT} />
+      </Section>
+      */}
+
+      <Pressable
+        onPress={handleExport}
+        disabled={exporting}
+        style={({ pressed }) => [
+          styles.exportBtn,
+          { backgroundColor: exporting ? '#334155' : COLORS.backgroundInverse, opacity: pressed ? 0.9 : 1 },
+        ]}
+        android_ripple={null}
+      >
+        <MaterialCommunityIcons name={exporting ? 'progress-download' : 'file-pdf-box'} size={20} color="#fff" />
+        <Text style={styles.exportText}>
+          {exporting ? 'Preparing PDF…' : 'Export full report (PDF)'}
+        </Text>
+      </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    padding: 26,
-  },
-  intro: {
-    fontSize: 13.5,
-    color: '#6b7178',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  grid3: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  note: {
-    fontSize: 12,
-    color: '#6b7178',
-    lineHeight: 20,
-    marginBottom: 12,
-    paddingLeft: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: '#e6e0d0',
-  },
-  chartContainer: {
-    backgroundColor: '#f6f2e8',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  assetTable: {
-    borderWidth: 1.5,
-    borderColor: '#d8d1bf',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  assetHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f6f2e8',
-    paddingVertical: 8,
-    paddingHorizontal: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e6e0d0',
-  },
-  assetHeaderCell: {
-    flex: 1,
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#6b7178',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  assetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee9dc',
-  },
-  assetTotal: {
-    backgroundColor: '#f6f2e8',
-    borderBottomWidth: 0,
-  },
-  assetCell: {
-    fontSize: 11,
-    color: '#232a2e',
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: COLORS.backgroundPage },
+  content: { paddingHorizontal: 20, paddingTop: 4 },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  chartContainer: { backgroundColor: '#fff', borderRadius: 20, padding: 10, alignItems: 'center' },
+  assetTable: { borderRadius: 12, overflow: 'hidden', backgroundColor: '#fff' },
+  assetHeader: { flexDirection: 'row', backgroundColor: '#f4f5f7', paddingHorizontal: 10, paddingVertical: 8 },
+  assetHeaderCell: { flex: 1, fontSize: 10.5, fontWeight: '700', color: '#6b7178', textTransform: 'uppercase' },
+  // Widths mirror the body row exactly (input width + its marginLeft) so the
+  // headers sit over the columns they label.
+  assetHeaderCost: { flex: 0, width: 82, marginLeft: 6, paddingRight: 6, textAlign: 'right' },
+  assetHeaderLife: { flex: 0, width: 54, marginLeft: 6, paddingRight: 6, textAlign: 'right' },
+  assetHeaderDep: { flex: 1, marginLeft: 6, textAlign: 'right' },
+  assetRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#eef0f3' },
+  assetCell: { flex: 1, fontSize: 11.5, color: '#232a2e', lineHeight: 16 },
   assetInput: {
-    borderWidth: 1.5,
-    borderColor: '#d8d1bf',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'System',
-    color: '#232a2e',
-    backgroundColor: '#fff',
-    width: 72,
-    textAlign: 'right',
-    marginRight: 4,
-  },
-  assetVal: {
-    fontSize: 11,
+    width: 82, borderWidth: 1, borderColor: '#eef0f3', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 6, backgroundColor: '#fff', textAlign: 'right',
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    color: '#6b7178',
-    flex: 1,
-    textAlign: 'right',
+    fontSize: 11.5, color: '#232a2e', marginLeft: 6, minHeight: 36,
   },
-  table: {
-    borderWidth: 1.5,
-    borderColor: '#d8d1bf',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f6f2e8',
-    paddingVertical: 8,
-    paddingHorizontal: 9,
-  },
-  th: {
-    flex: 1,
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#6b7178',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    textAlign: 'right',
-  },
-  tr: {
-    flexDirection: 'row',
-    paddingVertical: 7,
-    paddingHorizontal: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee9dc',
-  },
-  td: {
-    flex: 1,
-    fontSize: 11,
+  lifeInput: { width: 54 },
+  assetValue: {
+    flex: 1, fontSize: 11.5, color: '#6b7178', textAlign: 'right', marginLeft: 6,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    color: '#232a2e',
-    textAlign: 'right',
+  },
+  nonDepRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
+  nonDepLabel: { flex: 1, fontSize: 13, color: '#232a2e' },
+  nonDepValue: { fontSize: 12.5, color: '#6b7178', fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
+  totalRow: { borderBottomWidth: 0, borderTopWidth: 1.5, borderTopColor: '#d8d1bf', marginTop: 4 },
+  totalText: { fontWeight: '700', color: '#232a2e' },
+  linkBanner: {
+    backgroundColor: `${ACCENT}12`,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 12,
+  },
+  linkBannerText: { fontSize: 12, color: COLORS.textSecondary },
+  linkBannerNum: { fontWeight: '800', color: ACCENT },
+  exportBtn: {
+    marginTop: 22,
+    borderRadius: 999,
+    paddingVertical: 16,
+    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 56,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  exportText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
 });
