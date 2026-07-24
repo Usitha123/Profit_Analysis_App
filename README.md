@@ -1,24 +1,30 @@
-# React Native Expo App
+# Daycare Profit Analysis App
 
-A mobile application built with **React Native** and **Expo**.
+A mobile decision-support app for planning and analysing the finances of a daycare
+centre. Built with **React Native** and **Expo**, it turns operational-research
+models — staffing optimisation, cost allocation, break-even, growth and
+profitability — into interactive sliders, charts and an exportable business-plan
+report.
 
-## Features
+## Decision models (tabs)
 
-- Cross-platform (Android & iOS)
-- Fast development with Expo
-- Modern React Native architecture
-- Easy setup and deployment
+| Tab | Screen | What it answers |
+|-----|--------|-----------------|
+| **Staffing** | `LPScreen` | Minimum-cost staff plan under statutory child-to-staff ratios and a monthly budget cap. |
+| **Cost** | `COScreen` | Fixed + per-child cost ranges scaled to a target enrolment, with a staff floor from the staffing model. |
+| **Break-Even** | `BEScreen` | Enrolment where revenue meets total operating cost; fixed and variable cost composition donuts. |
+| **Growth** | `GRScreen` | Logistic enrolment ramp toward capacity, months-to-95% and break-even month. |
+| **Profit** | `PFScreen` | Net profit, ROI, payback and depreciation; capital allocation donut; PDF report export. |
+
+Staffing ratios, salaries and cost baselines live in `src/constants/modelData.js`
+and are the single source of truth across every tab and the exported report.
 
 ## Prerequisites
 
-Before running the project, make sure you have installed:
-
-- Node.js (LTS version)
-- npm or yarn
+- Node.js (LTS)
+- npm
 - Git
-- Expo Go (Android/iOS) or Android Studio/Xcode (optional)
-
-Check your installation:
+- Expo Go (Android/iOS), or Android Studio / a JDK + Android SDK for local APK builds
 
 ```bash
 node -v
@@ -27,200 +33,91 @@ npm -v
 
 ## Installation
 
-### 1. Clone the repository
-
 ```bash
-git clone https://github.com/your-username/your-repository.git
-```
-
-### 2. Navigate to the project folder
-
-```bash
-cd your-repository
-```
-
-### 3. Install dependencies
-
-```bash
+git clone https://github.com/Usitha123/Profit_Analysis_App.git
+cd Profit_Analysis_App
 npm install
 ```
 
-or
+## Running the app
 
 ```bash
-yarn
+npm start          # Expo dev server, then scan the QR code with Expo Go
+npm run android    # open on a connected Android device / emulator
+npm run ios        # open on iOS (macOS only)
+npm run web        # run in the browser
 ```
 
-## Running the Project
+## Testing
 
-Start the Expo development server:
+Model calculations are covered by Node's built-in test runner:
 
 ```bash
-npx expo start
+npm test
 ```
 
-or
+## Building a release APK
+
+The `build:apk` script runs an Expo prebuild then a Gradle release assemble
+(arm64-v8a):
 
 ```bash
-npm start
+npm run build:apk
 ```
 
-## Run on Android
+Output: `android/app/build/outputs/apk/release/app-release.apk`
 
-Using Expo Go:
-
-1. Install **Expo Go** from the Play Store.
-2. Run:
+Install it onto a connected device:
 
 ```bash
-npx expo start
+npm run install:apk
 ```
 
-3. Scan the QR code with Expo Go.
+> **Windows / PowerShell note:** the script calls `gradlew.bat` after `cd android`.
+> If your shell does not resolve it, run the Gradle step manually from the
+> `android/` folder with `.\gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a`.
 
-Using Android Emulator:
+### iOS builds
 
-```bash
-npx expo start --android
-```
-
-## Run on iOS
-
-(macOS only)
-
-```bash
-npx expo start --ios
-```
-
-Or scan the QR code using Expo Go on your iPhone.
-
-## Run on Web
-
-```bash
-npx expo start --web
-```
-
-## Project Structure
-
-```
-project-root/
-│
-├── assets/
-├── components/
-├── screens/
-├── navigation/
-├── app/
-├── hooks/
-├── constants/
-├── services/
-├── utils/
-├── package.json
-├── app.json
-└── README.md
-```
-
-## Useful Commands
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start development server:
-
-```bash
-npx expo start
-```
-
-Clear Expo cache:
-
-```bash
-npx expo start --clear
-```
-
-Check project health:
-
-```bash
-npx expo doctor
-```
-
-Update Expo packages:
-
-```bash
-npx expo install --fix
-```
-
-## Building the App
-
-Install EAS CLI:
+iOS binaries require macOS + Xcode, or a cloud build via EAS:
 
 ```bash
 npm install -g eas-cli
-```
-
-Login:
-
-```bash
 eas login
-```
-
-Configure the project:
-
-```bash
-eas build:configure
-```
-
-Build Android APK/AAB:
-
-```bash
-eas build --platform android
-```
-
-Build iOS:
-
-```bash
 eas build --platform ios
 ```
 
-## Troubleshooting
+There is no iOS simulator on Windows. To preview on iOS from a Windows machine,
+run `npm start` and open the project in **Expo Go** on a physical iPhone.
 
-If dependencies are corrupted:
+## Project structure
 
-```bash
-rm -rf node_modules
-rm package-lock.json
-npm install
+```
+Profit_Analysis_App/
+├── App.js                # entry, font + gesture-handler setup
+├── src/
+│   ├── AppMain.js        # tab shell and screen switching
+│   ├── screens/          # LP / CO / BE / GR / PF decision models
+│   ├── components/       # DataTable, DonutChart, sliders, cards, drawers…
+│   ├── constants/        # modelData, theme (incl. CHART_PALETTE), infoContent
+│   ├── context/          # PlannerContext — shared inputs + persistence
+│   └── utils/            # calculations.js (models), report.js (PDF export)
+├── tests/                # calculations.test.js
+├── assets/
+├── android/              # generated by expo prebuild (gitignored)
+├── app.json
+└── eas.json
 ```
 
-For Windows:
+## Tech stack
 
-```cmd
-rmdir /s /q node_modules
-del package-lock.json
-npm install
-```
-
-Clear Expo cache:
-
-```bash
-npx expo start --clear
-```
-
-## Technologies Used
-
-- React Native
-- Expo
-- JavaScript / TypeScript
-- React Navigation
-- Expo SDK
+- React Native + Expo (SDK 54)
+- `react-native-svg` — charts (donuts, break-even and growth plots)
+- `react-native-gesture-handler`, `react-native-reanimated`, `@gorhom/bottom-sheet` — UI
+- `@react-native-async-storage/async-storage` — planner persistence
+- `expo-print` + `expo-sharing` — business-plan PDF export
+- Node test runner — model unit tests
 
 ## License
 
-This project is licensed under the MIT License.
-
-## Author
-
-Your Name
-
-GitHub: https://github.com/your-username
+MIT
